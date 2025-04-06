@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from data.preprocess import to_tensor
+from processing.preprocess import to_tensor
 
 
 def evaluate_model(model, data, labels, device=None):

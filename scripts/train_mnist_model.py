@@ -4,11 +4,8 @@ This script trains a teacher model on the MNIST dataset, generates adversarial e
 and evaluates the models' performance on both clean and adversarial data.
 
 To run the script you can use the command:
-ipython scripts/train_mnist_model.py \
---lr 0.001 \
---batch_size 128 \
---max_epochs 50 \
---temperature 20
+ipython scripts/train_mnist_model.py -- --lr 0.001 --batch_size 128 --max_epochs 2 --temperature 20
+
 """
 
 
@@ -117,6 +114,8 @@ def main(
     # Train the teacher model
     teacher_losses = []
 
+    LOGGER.info("Training Teacher Model")
+
     for e in tqdm(range(max_epochs)):
         for images, labels in trainloader:
             images, labels = images.to(device), labels.to(device)
@@ -161,25 +160,27 @@ def main(
     teacher_model.to('cpu')
 
     # Adversarial attacks
-
+    LOGGER.info("Generating FSGM Adversarial Examples")
     attack = FastGradientMethod(estimator=art_model_t, eps=0.4, eps_step=0.1, batch_size=32, minimal=True, targeted=False, summary_writer=True)
     x_adv_fgm = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
     visualize_adversarial(mnist_data_subset, x_adv_fgm, mnist_targets_subset)
 
+    LOGGER.info("Generating DeepFool Adversarial Examples")
     attack = DeepFool(classifier=art_model_t, epsilon=0.001, max_iter=50, batch_size=32)
     x_adv_deepfool = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
     visualize_adversarial(mnist_data_subset, x_adv_deepfool, mnist_targets_subset)
 
+    LOGGER.info("Generating One Pixel Adversarial Examples")
     attack = PixelAttack(classifier=art_model_t, th=20, es=1, max_iter=50)   # Increase max_iter for better results
     x_adv_pixel = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
     visualize_adversarial(mnist_data_subset, x_adv_pixel, mnist_targets_subset)
 
     # FSGM
-    evaluate_adversarial_metrics(art_model_t.model, mnist_data_subset, mnist_targets_subset, x_adv_fgm, criterion=criterion, device='cpu')
+    LOGGER.info(evaluate_adversarial_metrics(art_model_t.model, mnist_data_subset, mnist_targets_subset, x_adv_fgm, device='cpu'))
     # DeepFool
-    evaluate_adversarial_metrics(art_model_t.model, mnist_data_subset, mnist_targets_subset, x_adv_deepfool, criterion=criterion, device='cpu')
+    LOGGER.info(evaluate_adversarial_metrics(art_model_t.model, mnist_data_subset, mnist_targets_subset, x_adv_deepfool, device='cpu'))
     # One Pixel Attack
-    evaluate_adversarial_metrics(art_model_t.model, mnist_data_subset, mnist_targets_subset, x_adv_pixel, criterion=criterion, device='cpu')
+    LOGGER.info(evaluate_adversarial_metrics(art_model_t.model, mnist_data_subset, mnist_targets_subset, x_adv_pixel, device='cpu'))
 
     ## Teacher Model
 
@@ -198,6 +199,7 @@ def main(
     # Generate soft labels for training the student
     soft_labels = get_soft_labels(teacher_model, trainloader, temperature)
 
+    LOGGER.info("Training Student Model")
     # Train the student model using knowledge distillation
     train_student(teacher_model, student_model, trainloader, temp=temperature, alpha=0.7, epochs=max_epochs, lr=lr)
 
@@ -220,11 +222,11 @@ def main(
     LOGGER.info(f"Original Test Accuracy: {original_accuracy:.2f}%")
 
     # FSGM
-    evaluate_adversarial_metrics(art_model_s.model, mnist_data_subset, mnist_targets_subset, x_adv_fgm, criterion=criterion, device='cpu')
+    evaluate_adversarial_metrics(art_model_s.model, mnist_data_subset, mnist_targets_subset, x_adv_fgm, device='cpu')
     # DeepFool
-    evaluate_adversarial_metrics(art_model_s.model, mnist_data_subset, mnist_targets_subset, x_adv_deepfool, criterion=criterion, device='cpu')
+    evaluate_adversarial_metrics(art_model_s.model, mnist_data_subset, mnist_targets_subset, x_adv_deepfool, device='cpu')
     # One Pixel Attack
-    evaluate_adversarial_metrics(art_model_s.model, mnist_data_subset, mnist_targets_subset, x_adv_pixel, criterion=criterion, device='cpu')
+    evaluate_adversarial_metrics(art_model_s.model, mnist_data_subset, mnist_targets_subset, x_adv_pixel,  device='cpu')
 
     LOGGER.info("Running Time: ", time.perf_counter() - start_time)
 
