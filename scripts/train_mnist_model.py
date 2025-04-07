@@ -170,8 +170,9 @@ def main(
         f"Mean Gradient Amplitude: {calculate_mean_gradient_amplitude(art_model_t.model, mnist_data, mnist_targets, criterion, device=device)}"
     )
 
-    # Ensure teacher model is on CPU to create the attacks
-    teacher_model.to("cpu")
+    # Ensure teacher model is not on mps to create the attacks
+    if device =="mps":
+        teacher_model.to("cpu")
 
     # Adversarial attacks
     # Generate Adversarial Examples from the Teacher Model
@@ -278,8 +279,9 @@ def main(
         f"Mean Gradient Amplitude: {calculate_mean_gradient_amplitude(art_model_s.model, mnist_data, mnist_targets, criterion, device=device)}"
     )
 
-    # Ensure teacher model is on CPU to create the attacks
-    student_model.to("cpu")
+    # Ensure student model is not on mps to create the attacks
+    if device =="mps":
+        student_model.to("cpu")
 
     # Adversarial attacks
     # Generate Adversarial Examples from the Student Model
@@ -318,8 +320,8 @@ def main(
     # Transfer model back to device
     student_model.to(device)
 
-    # Evaluate the teacher model on adversarial examples
-    LOGGER.info("Evaluating Teacher Model on Teacher-based Adversarial Examples:")
+    # Evaluate the student model on adversarial examples
+    LOGGER.info("Evaluating Student Model on Student-based Adversarial Examples:")
     # FSGM
     LOGGER.info(
         evaluate_adversarial_metrics(

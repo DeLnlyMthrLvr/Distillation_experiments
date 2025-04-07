@@ -115,6 +115,7 @@ def main(
         testset, batch_size=batch_size, shuffle=False
     )
 
+
     # Define a simple CNN model for CIFAR-10 classification
     teacher_model = Cifar10Net(input_size=w, temperature=temperature).to(device)
     student_model = Cifar10Net(input_size=w, temperature=temperature).to(device)
@@ -123,9 +124,11 @@ def main(
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.AdamW(teacher_model.parameters(), lr=lr)
 
-    # Get seperate vars for targets and data
-    cifar_targets = testset.targets.int().numpy()
-    cifar_data = testset.data.unsqueeze(1).float().numpy()
+    # Convert list to tensor first, then change to int and numpy
+    cifar_targets = torch.tensor(testset.targets).int().numpy()
+    # Convert data to tensor, permute to correct shape, and then convert to numpy
+    cifar_data = torch.tensor(testset.data).permute(0, 3, 1, 2).float().numpy()
+
 
     # Select a small test subset to attack
     # adversarial attacks can be slow, so we only use a small subset of the test set
@@ -170,8 +173,9 @@ def main(
         f"Mean Gradient Amplitude: {calculate_mean_gradient_amplitude(art_model_t.model, cifar_data, cifar_targets, criterion, device=device)}"
     )
 
-    # Ensure teacher model is on CPU to create the attacks
-    teacher_model.to("cpu")
+    # Ensure teacher model is not on mps to create the attacks
+    if device =="mps":
+        teacher_model.to("cpu")
 
     # Adversarial attacks
     # Generate Adversarial Examples from the Teacher Model
@@ -278,8 +282,9 @@ def main(
         f"Mean Gradient Amplitude: {calculate_mean_gradient_amplitude(art_model_s.model, cifar_data, cifar_targets, criterion, device=device)}"
     )
 
-    # Ensure teacher model is on CPU to create the attacks
-    student_model.to("cpu")
+    # Ensure student model is not on mps to create the attacks
+    if device =="mps":
+        student_model.to("cpu")
 
     # Adversarial attacks
     # Generate Adversarial Examples from the Student Model
