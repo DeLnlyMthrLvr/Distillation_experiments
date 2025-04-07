@@ -26,8 +26,6 @@ class MnistNet(nn.Module):
 
         self.flatten = nn.Flatten()
         self.activation = nn.ReLU()
-        self.dropout = nn.Dropout(0.2)
-        self.batchnorm = nn.BatchNorm1d(200)  # Now correctly applied
 
         self.temperature = temperature
 
