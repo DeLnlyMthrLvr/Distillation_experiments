@@ -1,8 +1,6 @@
-import torch 
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-
 
 
 class MnistNet(nn.Module):
@@ -51,5 +49,7 @@ class MnistNet(nn.Module):
         x = self.flatten(x)  # Flatten before FC layers
         x = self.activation(self.fc1(x))
         x = self.fc2(x)
-        x = F.log_softmax(x / self.temperature, dim=1)  # Use log_softmax for numerical stability
-        return x  
+        x = F.log_softmax(
+            x / self.temperature, dim=1
+        )  # Use log_softmax for numerical stability
+        return x

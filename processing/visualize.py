@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 
+
 def show_difference(original, adversarial, title="Method"):
     """
     Displays the original and adversarial images side by side, along with their difference.
@@ -14,18 +15,19 @@ def show_difference(original, adversarial, title="Method"):
     plt.figure(figsize=(10, 4))
 
     plt.subplot(1, 3, 1)
-    plt.imshow(original, cmap='gray')
+    plt.imshow(original, cmap="gray")
     plt.title("Original Image")
 
     plt.subplot(1, 3, 2)
-    plt.imshow(adversarial, cmap='gray')
+    plt.imshow(adversarial, cmap="gray")
     plt.title(f"Adversarial {title}")
 
     plt.subplot(1, 3, 3)
-    plt.imshow(diff, cmap='hot')
+    plt.imshow(diff, cmap="hot")
     plt.title("Difference (Perturbation)")
 
     plt.show()
+
 
 def visualize_adversarial(data, adversarial_data, labels, num_samples=5):
     """
@@ -44,7 +46,9 @@ def visualize_adversarial(data, adversarial_data, labels, num_samples=5):
         labels = labels.cpu().numpy()
 
     num_samples = min(num_samples, len(data))  # Ensure we don't exceed dataset size
-    indices = np.random.choice(len(data), num_samples, replace=False)  # Select random samples
+    indices = np.random.choice(
+        len(data), num_samples, replace=False
+    )  # Select random samples
 
     fig, axes = plt.subplots(num_samples, 2, figsize=(6, num_samples * 2))
     fig.suptitle("Original vs Adversarial Images", fontsize=14)
@@ -64,7 +68,7 @@ def visualize_adversarial(data, adversarial_data, labels, num_samples=5):
     plt.show()
 
 
-def visualize_from_dataloader(model, dataloader, temp, device='cpu'):
+def visualize_from_dataloader(model, dataloader, temp, device="cpu"):
     """
     Selects a random MNIST image from the dataset, gets its label, and computes its soft labels.
 

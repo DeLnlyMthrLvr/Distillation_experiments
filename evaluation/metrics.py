@@ -48,7 +48,7 @@ def evaluate_model(model, data, labels, device=None):
 def calculate_asr(preds_clean, preds_adv):
     """
     Calculate Adversarial Success Rate (ASR).
-    
+
     Args:
         preds_clean: Model predictions on clean data.
         preds_adv: Model predictions on adversarial data.
@@ -59,6 +59,7 @@ def calculate_asr(preds_clean, preds_adv):
     successful_attacks = (preds_clean != preds_adv).sum().item()
     asr = (successful_attacks / len(preds_clean)) * 100
     return asr
+
 
 def calculate_mean_gradient_amplitude(model, data, labels, criterion, device=None):
     """Calculate Mean Gradient Amplitude divided into 10 bins.
@@ -94,10 +95,11 @@ def calculate_mean_gradient_amplitude(model, data, labels, criterion, device=Non
     mean_gradient_amplitude = bin_counts / len(labels)
     return mean_gradient_amplitude.tolist()
 
+
 def calculate_robustness(data, adv_data):
     """
     Calculate Robustness as the average minimum effective perturbation.
-    
+
     Args:
         data: Original input samples (NumPy array or Tensor).
         adv_data: Adversarial input samples (NumPy array or Tensor).
@@ -106,10 +108,10 @@ def calculate_robustness(data, adv_data):
     """
     perturbations = (adv_data - data).view(len(data), -1).norm(p=2, dim=1)
     robustness = perturbations.mean().item()
-    
+
     # Compute Average maximum perturbation (Normalized images)
     n_channels, w, h = data.shape[1], data.shape[2], data.shape[3]
-    
+
     # Calculate the product of the last three dimensions
     max_robustness = n_channels * w * h
 
@@ -117,10 +119,11 @@ def calculate_robustness(data, adv_data):
 
     return robustness_ratio
 
+
 def calculate_adversarial_confidence(outputs_adv):
     """
     Calculate the average classification confidence on adversarial examples.
-    
+
     Assumes that outputs_adv are log probabilities (log softmax).
 
     Args:
@@ -133,7 +136,6 @@ def calculate_adversarial_confidence(outputs_adv):
     confidence_adv = probabilities.max(dim=1).values
     mean_confidence = confidence_adv.mean().item() * 100
     return mean_confidence
-
 
 
 def evaluate_adversarial_metrics(model, data, labels, adv_data, device=None):
@@ -175,9 +177,11 @@ def evaluate_adversarial_metrics(model, data, labels, adv_data, device=None):
 
     # Calculate metrics
     metrics = {
-        'Adversarial Success Rate': calculate_asr(preds_clean, preds_adv),
-        'Adversarial Robustness % (Avg Min Perturbation)': calculate_robustness(data, adv_data),
-        'Adversarial Confidence': calculate_adversarial_confidence(outputs_adv)
+        "Adversarial Success Rate": calculate_asr(preds_clean, preds_adv),
+        "Adversarial Robustness % (Avg Min Perturbation)": calculate_robustness(
+            data, adv_data
+        ),
+        "Adversarial Confidence": calculate_adversarial_confidence(outputs_adv),
     }
 
     return metrics

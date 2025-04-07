@@ -7,6 +7,7 @@ import logging
 
 LOGGER = logging.getLogger(__name__)
 
+
 def get_soft_labels(model, dataloader, temp, device):
 
     soft_labels_list = []
@@ -34,8 +35,7 @@ def distillation_loss(student_logits, teacher_soft_labels, hard_labels, temp, al
         alpha: Weight for soft loss (1-alpha for hard loss).
     """
     soft_loss = nn.KLDivLoss(reduction="batchmean")(
-        torch.log_softmax(student_logits / temp, dim=1),
-        teacher_soft_labels
+        torch.log_softmax(student_logits / temp, dim=1), teacher_soft_labels
     )
     hard_loss = nn.CrossEntropyLoss()(student_logits, hard_labels)
     return alpha * soft_loss + (1 - alpha) * hard_loss
@@ -89,9 +89,16 @@ def train_teacher(teacher_model, trainloader, criterion, optimizer, device, epoc
     return teacher_losses
 
 
-
-
-def train_student(teacher_model, student_model, trainloader, criterion, epochs=10, lr=0.01, temperature=1.0, device=None):
+def train_student(
+    teacher_model,
+    student_model,
+    trainloader,
+    criterion,
+    epochs=10,
+    lr=0.01,
+    temperature=1.0,
+    device=None,
+):
     """
     Trains the student model using defensive distillation.
 
@@ -109,7 +116,7 @@ def train_student(teacher_model, student_model, trainloader, criterion, epochs=1
         student_losses: List of loss values per epoch.
     """
     if device is None:
-        device = 'cpu'
+        device = "cpu"
 
     # Move models to device
     teacher_model.to(device)
@@ -129,7 +136,9 @@ def train_student(teacher_model, student_model, trainloader, criterion, epochs=1
             # Get teacher soft labels (detach to prevent gradient flow)
             with torch.no_grad():
                 teacher_logits = teacher_model(images)
-                soft_labels = torch.softmax(teacher_logits / temperature, dim=1)  # Soft labels directly
+                soft_labels = torch.softmax(
+                    teacher_logits / temperature, dim=1
+                )  # Soft labels directly
 
             # Get student predictions
             student_logits = student_model(images)
@@ -155,8 +164,16 @@ def train_student(teacher_model, student_model, trainloader, criterion, epochs=1
     return student_losses
 
 
-
-def train_student_two_losses(teacher_model, student_model, trainloader, temp=20, alpha=0.7, epochs=10, lr=0.01, device=None):
+def train_student_two_losses(
+    teacher_model,
+    student_model,
+    trainloader,
+    temp=20,
+    alpha=0.7,
+    epochs=10,
+    lr=0.01,
+    device=None,
+):
     """
     Trains the student model using defensive distillation, and hard-soft losses.
 
@@ -173,11 +190,10 @@ def train_student_two_losses(teacher_model, student_model, trainloader, temp=20,
 
     if device is None:
         device = "cpu"
-    
+
     # Move models to device
     teacher_model.to(device)
     student_model.to(device)
-
 
     student_model.train()
     optimizer = optim.Adam(student_model.parameters(), lr=lr)
@@ -196,8 +212,10 @@ def train_student_two_losses(teacher_model, student_model, trainloader, temp=20,
             student_logits = student_model(images)
 
             # Compute distillation loss
-            loss = distillation_loss(student_logits, soft_labels, hard_labels, temp, alpha)
-            
+            loss = distillation_loss(
+                student_logits, soft_labels, hard_labels, temp, alpha
+            )
+
             # Backpropagation
             optimizer.zero_grad()
             loss.backward()
