@@ -18,7 +18,8 @@ def evaluate_model(model, data, labels, device=None):
     """
     # Check if CUDA is available, otherwise fallback to CPU
     if device is None:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = "cpu"
+    # Move model to device
     model.to(device)
     model.eval()  # Set model to evaluation mode
 
@@ -59,7 +60,7 @@ def calculate_asr(preds_clean, preds_adv):
     asr = (successful_attacks / len(preds_clean)) * 100
     return asr
 
-def calculate_mean_gradient_amplitude(model, data, labels, criterion):
+def calculate_mean_gradient_amplitude(model, data, labels, criterion, device=None):
     """Calculate Mean Gradient Amplitude divided into 10 bins.
     Args:
         model: PyTorch model.
@@ -69,6 +70,18 @@ def calculate_mean_gradient_amplitude(model, data, labels, criterion):
     Returns:
         mean_gradient_amplitude (list): Mean gradient amplitude divided into 10 bins.
     """
+
+    # Check if CUDA is available, otherwise fallback to CPU
+    if device is None:
+        device = "cpu"
+    # Move model to device
+    model.to(device)
+    model.eval()  # Set model to evaluation mode
+
+    # Convert data to PyTorch tensors if needed
+    data = to_tensor(data, device)
+    labels = to_tensor(labels, device).long()
+
     data.requires_grad = True
     outputs = model(data)
     loss = criterion(outputs, labels)
@@ -140,7 +153,8 @@ def evaluate_adversarial_metrics(model, data, labels, adv_data, device=None):
 
     # Check if CUDA is available, otherwise fallback to CPU
     if device is None:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = "cpu"
+    # Move model to device
     model.to(device)
     model.eval()  # Set model to evaluation mode
 

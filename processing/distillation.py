@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-import tqdm
+from tqdm import tqdm
 import torch.optim as optim
 import logging
 
@@ -8,6 +8,7 @@ import logging
 LOGGER = logging.getLogger(__name__)
 
 def get_soft_labels(model, dataloader, temp, device):
+
     soft_labels_list = []
     model.eval()
     with torch.no_grad():
@@ -40,7 +41,7 @@ def distillation_loss(student_logits, teacher_soft_labels, hard_labels, temp, al
     return alpha * soft_loss + (1 - alpha) * hard_loss
 
 
-def train_student(teacher_model, student_model, trainloader, temp=20, alpha=0.7, epochs=10, lr=0.01, device='cpu'):
+def train_student(teacher_model, student_model, trainloader, temp=20, alpha=0.7, epochs=10, lr=0.01, device=None):
     """
     Trains the student model using knowledge distillation.
 
@@ -54,6 +55,15 @@ def train_student(teacher_model, student_model, trainloader, temp=20, alpha=0.7,
         lr: Learning rate.
         device: Device to run the training on.
     """
+
+    if device is None:
+        device = "cpu"
+    
+    # Move models to device
+    teacher_model.to(device)
+    student_model.to(device)
+
+
     student_model.train()
     optimizer = optim.Adam(student_model.parameters(), lr=lr)
 

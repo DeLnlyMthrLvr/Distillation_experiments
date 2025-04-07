@@ -2,3 +2,4 @@ notebooks/data/*
 runs
 notebooks/runs/*
 notebooks/images/*
+__pycache__/
