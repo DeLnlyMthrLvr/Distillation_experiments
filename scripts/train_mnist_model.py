@@ -1,14 +1,13 @@
 """
 Train a teacher model on MNIST, generate adversarial examples, and evaluate the models.
 
-This script trains a teacher model on the MNIST dataset, generates adversarial examples using various attacks, 
+This script trains a teacher model on the MNIST dataset, generates adversarial examples using various attacks,
 and evaluates the models' performance on both clean and adversarial data.
 
 To run the script you can use the following command, adjusting argumments as needed:
-ipython scripts/train_mnist_model.py -- --lr 0.001 --batch_size 128 --max_epochs 20 --temperature 20 --num_samples 100 --device 'mps'
+ipython scripts/train_mnist_model.py -- --lr 0.001 --batch_size 256 --max_epochs 20 --temperature 20 --num_samples 100 --device 'mps'
 
 """
-
 
 import torch
 import torch.nn as nn
@@ -32,9 +31,9 @@ from evaluation.metrics import evaluate_adversarial_metrics
 from evaluation.metrics import evaluate_model
 from processing.visualize import show_difference
 from processing.visualize import visualize_adversarial
-from processing.distillation import get_soft_labels
-from processing.distillation import train_student
+from processing.distillation import train_student, train_teacher
 from evaluation.metrics import calculate_mean_gradient_amplitude
+from utils.experiment_saver import save_experiment_results
 
 
 from art.attacks.evasion.fast_gradient import FastGradientMethod
@@ -49,6 +48,7 @@ logging.basicConfig(
 
 LOGGER = logging.getLogger(__name__)
 
+
 def main(
     lr: float,
     batch_size: int,
@@ -59,6 +59,7 @@ def main(
     temperature: float,
     num_samples: int,
     device: str,
+    save_path: str,
 ):
     """
     Main function to train a teacher and a distilled studemt model on MNIST, generate adversarial examples, and evaluate the models.
@@ -73,6 +74,7 @@ def main(
         temperature (float): Temperature parameter for softmax scaling / distillation.
         num_samples (int): Number of samples to use for generating adversarial examples.
         device (str): Device to run the training and evaluation on.
+        save_path (str): Path to save the experiment results.
     """
     ssl._create_default_https_context = ssl._create_stdlib_context
 
@@ -89,21 +91,29 @@ def main(
 
     LOGGER.info(f"Playing on {device}")
 
-    dt_p = Path('data/mnist')
+    dt_p = Path("data/mnist")
 
     # Specify classes as string and number of labels
     classes = [str(i) for i in range(10)]
     n_labels = len(classes)
 
     transform = transforms.Compose(
-        [transforms.ToTensor(),
-        transforms.Normalize((0.1307,), (0.3081,))])
+        [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
+    )
 
     # Load MNIST dataset
-    trainset = datasets.MNIST(root=f'{dt_p.absolute()}/train', train=True, download=True, transform=transform)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True)
-    testset = datasets.MNIST(root=f'{dt_p.absolute()}/test', train=False, download=True, transform=transform)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False)
+    trainset = datasets.MNIST(
+        root=f"{dt_p.absolute()}/train", train=True, download=True, transform=transform
+    )
+    trainloader = torch.utils.data.DataLoader(
+        trainset, batch_size=batch_size, shuffle=True
+    )
+    testset = datasets.MNIST(
+        root=f"{dt_p.absolute()}/test", train=False, download=True, transform=transform
+    )
+    testloader = torch.utils.data.DataLoader(
+        testset, batch_size=batch_size, shuffle=False
+    )
 
     # Define a simple CNN model for MNIST classification
     teacher_model = MnistNet(input_size=w, temperature=temperature).to(device)
@@ -124,33 +134,22 @@ def main(
     mnist_data_shuffled = mnist_data[indices]
     mnist_targets_shuffled = mnist_targets[indices]
     # Then select subsets
-    mnist_data_subset = mnist_data_shuffled[:num_samples]/255
+    mnist_data_subset = mnist_data_shuffled[:num_samples] / 255
     mnist_targets_subset = mnist_targets_shuffled[:num_samples]
-
 
     ## Teacher Model
 
-    LOGGER.info("Training Teacher Model")
+    LOGGER.info("\nTraining Teacher Model")
 
-    # Train the teacher model
-    teacher_losses = []
+    teacher_losses = train_teacher(
+        teacher_model,
+        trainloader,
+        epochs=max_epochs,
+        criterion=criterion,
+        optimizer=optimizer,
+        device=device,
+    )
 
-    for e in tqdm(range(max_epochs)):
-        for images, labels in trainloader:
-            images, labels = images.to(device), labels.to(device)
-            # Forward pass
-            logits = teacher_model(images)
-            # Compute loss
-            loss = criterion(logits, labels)
-            # Backward pass
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-        teacher_losses.append(loss.item())
-        
-        if e % 10 == 0 or e == max_epochs-1:
-            LOGGER.info(f"Epoch {e}: {loss.item()}")
-    
     # Wrap in ART PyTorchClassifier
     art_model_t = PyTorchClassifier(
         model=teacher_model,
@@ -161,34 +160,46 @@ def main(
         nb_classes=n_labels,
     )
 
-
     # Evaluate model on entire testset
-    original_accuracy = evaluate_model(
+    teacher_accuracy = evaluate_model(
         art_model_t.model, mnist_data, mnist_targets, device=device
     )
-    LOGGER.info(f"Test Accuracy: {original_accuracy:.2f}%")
+    LOGGER.info(f"Test Accuracy: {teacher_accuracy:.2f}%")
 
-    LOGGER.info(f"Mean Gradient Amplitude: {calculate_mean_gradient_amplitude(art_model_t.model, mnist_data, 
-                                                                              mnist_targets, criterion, device=device)}")
+    LOGGER.info(
+        f"Mean Gradient Amplitude: {calculate_mean_gradient_amplitude(art_model_t.model, mnist_data, mnist_targets, criterion, device=device)}"
+    )
 
     # Ensure teacher model is on CPU to create the attacks
-    teacher_model.to('cpu')
+    teacher_model.to("cpu")
 
     # Adversarial attacks
     # Generate Adversarial Examples from the Teacher Model
-    LOGGER.info("Generating Adversarial Examples from Teacher Model:")
+    LOGGER.info("\nGenerating Adversarial Examples from Teacher Model:")
 
     LOGGER.info("Generating FSGM Adversarial Examples")
-    attack = FastGradientMethod(estimator=art_model_t, eps=0.4, eps_step=0.1, batch_size=32, minimal=True, targeted=False, summary_writer=True)
+    attack = FastGradientMethod(
+        estimator=art_model_t,
+        eps=0.4,
+        eps_step=0.1,
+        batch_size=32,
+        minimal=True,
+        targeted=False,
+        summary_writer=True,
+    )
     x_adv_fgm = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
     visualize_adversarial(mnist_data_subset, x_adv_fgm, mnist_targets_subset)
-    show_difference(mnist_data_subset[0][0], x_adv_fgm[0][0], title="Fast-Gradient Method")
+    show_difference(
+        mnist_data_subset[0][0], x_adv_fgm[0][0], title="Fast-Gradient Method"
+    )
 
     LOGGER.info("Generating DeepFool Adversarial Examples")
     attack = DeepFool(classifier=art_model_t, epsilon=0.001, max_iter=50, batch_size=32)
     x_adv_deepfool = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
     visualize_adversarial(mnist_data_subset, x_adv_deepfool, mnist_targets_subset)
-    show_difference(mnist_data_subset[0][0], x_adv_deepfool[0][0], title="Deepfool Method")
+    show_difference(
+        mnist_data_subset[0][0], x_adv_deepfool[0][0], title="Deepfool Method"
+    )
 
     LOGGER.info("Generating One Pixel Adversarial Examples")
     attack = PixelAttack(classifier=art_model_t, th=5, es=1, max_iter=50)
@@ -202,19 +213,50 @@ def main(
     # Evaluate the teacher model on adversarial examples
     LOGGER.info("Evaluating Teacher Model on Teacher-based Adversarial Examples:")
     # FSGM
-    LOGGER.info(evaluate_adversarial_metrics(art_model_t.model, mnist_data_subset, mnist_targets_subset, x_adv_fgm, device=device))
+    LOGGER.info(
+        evaluate_adversarial_metrics(
+            art_model_t.model,
+            mnist_data_subset,
+            mnist_targets_subset,
+            x_adv_fgm,
+            device=device,
+        )
+    )
     # DeepFool
-    LOGGER.info(evaluate_adversarial_metrics(art_model_t.model, mnist_data_subset, mnist_targets_subset, x_adv_deepfool, device=device))
+    LOGGER.info(
+        evaluate_adversarial_metrics(
+            art_model_t.model,
+            mnist_data_subset,
+            mnist_targets_subset,
+            x_adv_deepfool,
+            device=device,
+        )
+    )
     # One Pixel Attack
-    LOGGER.info(evaluate_adversarial_metrics(art_model_t.model, mnist_data_subset, mnist_targets_subset, x_adv_pixel, device=device))
-
-
+    LOGGER.info(
+        evaluate_adversarial_metrics(
+            art_model_t.model,
+            mnist_data_subset,
+            mnist_targets_subset,
+            x_adv_pixel,
+            device=device,
+        )
+    )
 
     ## Student Model
 
-    LOGGER.info("Training Student Model using Defensive Distillation")
+    LOGGER.info("\nTraining Student Model using Defensive Distillation")
     # Train the student model using knowledge distillation
-    train_student(teacher_model, student_model, trainloader, temp=temperature, alpha=0.7, epochs=max_epochs, lr=lr, device=device)
+    train_student(
+        teacher_model,
+        student_model,
+        trainloader,
+        criterion=criterion,
+        epochs=max_epochs,
+        lr=lr,
+        temperature=temperature,
+        device=device,
+    )
 
     # Wrap in ART PyTorchClassifier
     art_model_s = PyTorchClassifier(
@@ -223,37 +265,49 @@ def main(
         loss=criterion,
         optimizer=optimizer,
         input_shape=(1, 28, 28),
-        nb_classes=10
+        nb_classes=10,
     )
 
     # Evaluate model on entire testset
-    original_accuracy = evaluate_model(
+    student_accuracy = evaluate_model(
         art_model_s.model, mnist_data, mnist_targets, device=device
     )
-    LOGGER.info(f"Test Accuracy: {original_accuracy:.2f}%")
+    LOGGER.info(f"Test Accuracy: {student_accuracy:.2f}%")
 
-    LOGGER.info(f"Mean Gradient Amplitude: {calculate_mean_gradient_amplitude(art_model_s.model, mnist_data, 
-                                                                              mnist_targets, criterion, device=device)}")
-
+    LOGGER.info(
+        f"Mean Gradient Amplitude: {calculate_mean_gradient_amplitude(art_model_s.model, mnist_data, mnist_targets, criterion, device=device)}"
+    )
 
     # Ensure teacher model is on CPU to create the attacks
-    student_model.to('cpu')
+    student_model.to("cpu")
 
     # Adversarial attacks
     # Generate Adversarial Examples from the Student Model
-    LOGGER.info("Generating Adversarial Examples from Student Model:")
+    LOGGER.info("\nGenerating Adversarial Examples from Student Model:")
 
     LOGGER.info("Generating FSGM Adversarial Examples")
-    attack = FastGradientMethod(estimator=art_model_s, eps=0.4, eps_step=0.1, batch_size=32, minimal=True, targeted=False, summary_writer=True)
+    attack = FastGradientMethod(
+        estimator=art_model_s,
+        eps=0.4,
+        eps_step=0.1,
+        batch_size=32,
+        minimal=True,
+        targeted=False,
+        summary_writer=True,
+    )
     x_adv_fgm_s = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
     visualize_adversarial(mnist_data_subset, x_adv_fgm_s, mnist_targets_subset)
-    show_difference(mnist_data_subset[0][0], x_adv_fgm_s[0][0], title="Fast-Gradient Method")
+    show_difference(
+        mnist_data_subset[0][0], x_adv_fgm_s[0][0], title="Fast-Gradient Method"
+    )
 
     LOGGER.info("Generating DeepFool Adversarial Examples")
     attack = DeepFool(classifier=art_model_s, epsilon=0.001, max_iter=50, batch_size=32)
     x_adv_deepfool_s = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
     visualize_adversarial(mnist_data_subset, x_adv_deepfool_s, mnist_targets_subset)
-    show_difference(mnist_data_subset[0][0], x_adv_deepfool_s[0][0], title="Deepfool Method")
+    show_difference(
+        mnist_data_subset[0][0], x_adv_deepfool_s[0][0], title="Deepfool Method"
+    )
 
     LOGGER.info("Generating One Pixel Adversarial Examples")
     attack = PixelAttack(classifier=art_model_s, th=5, es=1, max_iter=50)
@@ -267,15 +321,186 @@ def main(
     # Evaluate the teacher model on adversarial examples
     LOGGER.info("Evaluating Teacher Model on Teacher-based Adversarial Examples:")
     # FSGM
-    LOGGER.info(evaluate_adversarial_metrics(art_model_s.model, mnist_data_subset, mnist_targets_subset, x_adv_fgm_s, device=device))
+    LOGGER.info(
+        evaluate_adversarial_metrics(
+            art_model_s.model,
+            mnist_data_subset,
+            mnist_targets_subset,
+            x_adv_fgm_s,
+            device=device,
+        )
+    )
     # DeepFool
-    LOGGER.info(evaluate_adversarial_metrics(art_model_s.model, mnist_data_subset, mnist_targets_subset, x_adv_deepfool_s, device=device))
+    LOGGER.info(
+        evaluate_adversarial_metrics(
+            art_model_s.model,
+            mnist_data_subset,
+            mnist_targets_subset,
+            x_adv_deepfool_s,
+            device=device,
+        )
+    )
     # One Pixel Attack
-    LOGGER.info(evaluate_adversarial_metrics(art_model_s.model, mnist_data_subset, mnist_targets_subset, x_adv_pixel_s, device=device))
+    LOGGER.info(
+        evaluate_adversarial_metrics(
+            art_model_s.model,
+            mnist_data_subset,
+            mnist_targets_subset,
+            x_adv_pixel_s,
+            device=device,
+        )
+    )
+
+    ## Cross-Result Evaluation
+    LOGGER.info("\nCross-Result Evaluation:")
+    LOGGER.info("Evaluating Student Model on Teacher-based Adversarial Examples:")
+    # FSGM
+    LOGGER.info(
+        evaluate_adversarial_metrics(
+            art_model_s.model,
+            mnist_data_subset,
+            mnist_targets_subset,
+            x_adv_fgm,
+            device=device,
+        )
+    )
+    # DeepFool
+    LOGGER.info(
+        evaluate_adversarial_metrics(
+            art_model_s.model,
+            mnist_data_subset,
+            mnist_targets_subset,
+            x_adv_deepfool,
+            device=device,
+        )
+    )
+    # One Pixel Attack
+    LOGGER.info(
+        evaluate_adversarial_metrics(
+            art_model_s.model,
+            mnist_data_subset,
+            mnist_targets_subset,
+            x_adv_pixel,
+            device=device,
+        )
+    )
+    LOGGER.info("Evaluating Teacher Model on Student-based Adversarial Examples:")
+    # FSGM
+    LOGGER.info(
+        evaluate_adversarial_metrics(
+            art_model_t.model,
+            mnist_data_subset,
+            mnist_targets_subset,
+            x_adv_fgm_s,
+            device=device,
+        )
+    )
+    # DeepFool
+    LOGGER.info(
+        evaluate_adversarial_metrics(
+            art_model_t.model,
+            mnist_data_subset,
+            mnist_targets_subset,
+            x_adv_deepfool_s,
+            device=device,
+        )
+    )
+    # One Pixel Attack
+    LOGGER.info(
+        evaluate_adversarial_metrics(
+            art_model_t.model,
+            mnist_data_subset,
+            mnist_targets_subset,
+            x_adv_pixel_s,
+            device=device,
+        )
+    )
+
+    # Save experiment results
+    LOGGER.info("Saving experiment results")
+    save_experiment_results(
+        save_path,
+        [
+            "Epochs",
+            "Learning Rate",
+            "Batch Size",
+            "Temperature",
+            "Num Samples",
+            "Accuracy (T)",
+            "Mean Gradient Amplitude (T)",
+            "Metrics (FSGM)",
+            "Metrics (DeepFool)",
+            "Metrics (Pixel)",
+            "Accuracy (S)",
+            "Mean Gradient Amplitude (S)",
+            "Metrics (FSGM)",
+            "Metrics (DeepFool)",
+            "Metrics (Pixel)",
+        ],
+        [
+            max_epochs,
+            lr,
+            batch_size,
+            temperature,
+            num_samples,
+            teacher_accuracy,
+            calculate_mean_gradient_amplitude(
+                art_model_t.model, mnist_data, mnist_targets, criterion, device=device
+            ),
+            evaluate_adversarial_metrics(
+                art_model_t.model,
+                mnist_data_subset,
+                mnist_targets_subset,
+                x_adv_fgm,
+                device=device,
+            ),
+            evaluate_adversarial_metrics(
+                art_model_t.model,
+                mnist_data_subset,
+                mnist_targets_subset,
+                x_adv_deepfool,
+                device=device,
+            ),
+            evaluate_adversarial_metrics(
+                art_model_t.model,
+                mnist_data_subset,
+                mnist_targets_subset,
+                x_adv_pixel,
+                device=device,
+            ),
+            student_accuracy,
+            calculate_mean_gradient_amplitude(
+                art_model_s.model, mnist_data, mnist_targets, criterion, device=device
+            ),
+            evaluate_adversarial_metrics(
+                art_model_s.model,
+                mnist_data_subset,
+                mnist_targets_subset,
+                x_adv_fgm_s,
+                device=device,
+            ),
+            evaluate_adversarial_metrics(
+                art_model_s.model,
+                mnist_data_subset,
+                mnist_targets_subset,
+                x_adv_deepfool_s,
+                device=device,
+            ),
+            evaluate_adversarial_metrics(
+                art_model_s.model,
+                mnist_data_subset,
+                mnist_targets_subset,
+                x_adv_pixel_s,
+                device=device,
+            ),
+        ],
+    )
 
     # Display total running time for script
     LOGGER.info(f"Running Time (seconds): {round(time.perf_counter() - start_time, 2)}")
-    LOGGER.info(f"Running Time (minutes): {round((time.perf_counter() - start_time) / 60, 2)}")
+    LOGGER.info(
+        f"Running Time (minutes): {round((time.perf_counter() - start_time) / 60, 2)}"
+    )
     LOGGER.info("Script complete!")
 
 
@@ -287,9 +512,27 @@ if __name__ == "__main__":
     parser.add_argument("--w", type=int, default=28, help="Width of the input images.")
     parser.add_argument("--h", type=int, default=28, help="Height of the input images.")
     parser.add_argument("--max_epochs", type=int, default=50, help="Number of epochs.")
-    parser.add_argument("--temperature", type=float, default=20, help="Temperature for soft labels.")
-    parser.add_argument("--num_samples", type=int, default=100, help="Number of samples for adversarial attacks.")
-    parser.add_argument("--device", type=str, default="cpu", help="Device to run the training and evaluation on.")
+    parser.add_argument(
+        "--save_path",
+        type=str,
+        default="experiments/results.csv",
+        help="Path to save the experiment results.",
+    )
+    parser.add_argument(
+        "--temperature", type=float, default=20, help="Temperature for soft labels."
+    )
+    parser.add_argument(
+        "--num_samples",
+        type=int,
+        default=100,
+        help="Number of samples for adversarial attacks.",
+    )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cpu",
+        help="Device to run the training and evaluation on.",
+    )
     args = parser.parse_args()
     # Call the main function with parsed arguments
     main(
@@ -302,4 +545,5 @@ if __name__ == "__main__":
         temperature=args.temperature,
         num_samples=args.num_samples,
         device=args.device,
+        save_path=args.save_path,
     )

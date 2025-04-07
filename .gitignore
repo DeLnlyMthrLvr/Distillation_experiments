@@ -3,3 +3,4 @@ runs
 notebooks/runs/*
 notebooks/images/*
 __pycache__/
+experiments/

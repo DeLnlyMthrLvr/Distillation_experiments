@@ -41,9 +41,124 @@ def distillation_loss(student_logits, teacher_soft_labels, hard_labels, temp, al
     return alpha * soft_loss + (1 - alpha) * hard_loss
 
 
-def train_student(teacher_model, student_model, trainloader, temp=20, alpha=0.7, epochs=10, lr=0.01, device=None):
+## No distillation used here:
+def train_teacher(teacher_model, trainloader, criterion, optimizer, device, epochs):
     """
-    Trains the student model using knowledge distillation.
+    Train the teacher model.
+
+    Parameters:
+    teacher_model: The PyTorch model to be trained.
+    trainloader: DataLoader for the training data.
+    criterion: Loss function.
+    optimizer: Optimizer for updating model weights.
+    device: Device to perform training on (CPU or GPU).
+    max_epochs: Maximum number of training epochs.
+
+    Returns:
+    teacher_losses: List of loss values per epoch.
+    """
+    teacher_losses = []
+
+    teacher_model.to(device)
+    teacher_model.train()
+
+    for epoch in tqdm(range(epochs)):
+        epoch_loss = 0.0
+        for images, labels in trainloader:
+            images, labels = images.to(device), labels.to(device)
+
+            # Forward pass
+            logits = teacher_model(images)
+            loss = criterion(logits, labels)
+
+            # Backward pass
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            epoch_loss += loss.item()
+
+        # Record the average loss for the epoch
+        avg_loss = epoch_loss / len(trainloader)
+        teacher_losses.append(avg_loss)
+
+        # Logging every 10 epochs or on the last epoch
+        if epoch % 10 == 0 or epoch == epochs - 1:
+            LOGGER.info(f"Epoch {epoch}/{epochs - 1}: Loss = {avg_loss:.4f}")
+
+    return teacher_losses
+
+
+
+
+def train_student(teacher_model, student_model, trainloader, criterion, epochs=10, lr=0.01, temperature=1.0, device=None):
+    """
+    Trains the student model using defensive distillation.
+
+    Args:
+        teacher_model: Pretrained teacher model.
+        student_model: Student model to train.
+        trainloader: DataLoader for training.
+        criterion: Loss function.
+        epochs: Number of training epochs.
+        lr: Learning rate.
+        temperature: Temperature applied for soft labels.
+        device: Device to run the training on.
+
+    Returns:
+        student_losses: List of loss values per epoch.
+    """
+    if device is None:
+        device = 'cpu'
+
+    # Move models to device
+    teacher_model.to(device)
+    student_model.to(device)
+
+    student_model.train()
+    teacher_model.eval()  # Ensure teacher is in evaluation mode (no gradients)
+
+    optimizer = optim.Adam(student_model.parameters(), lr=lr)
+    student_losses = []
+
+    for epoch in tqdm(range(epochs)):
+        epoch_loss = 0.0
+        for images, _ in trainloader:
+            images = images.to(device)
+
+            # Get teacher soft labels (detach to prevent gradient flow)
+            with torch.no_grad():
+                teacher_logits = teacher_model(images)
+                soft_labels = torch.softmax(teacher_logits / temperature, dim=1)  # Soft labels directly
+
+            # Get student predictions
+            student_logits = student_model(images)
+
+            # Compute loss using teacher's soft labels
+            loss = criterion(student_logits, soft_labels)
+
+            # Backpropagation
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            epoch_loss += loss.item()
+
+        # Record the average loss for the epoch
+        avg_loss = epoch_loss / len(trainloader)
+        student_losses.append(avg_loss)
+
+        # Logging every 10 epochs or on the last epoch
+        if epoch % 10 == 0 or epoch == epochs - 1:
+            LOGGER.info(f"Epoch {epoch}/{epochs - 1}: Loss = {avg_loss:.4f}")
+
+    return student_losses
+
+
+
+def train_student_two_losses(teacher_model, student_model, trainloader, temp=20, alpha=0.7, epochs=10, lr=0.01, device=None):
+    """
+    Trains the student model using defensive distillation, and hard-soft losses.
 
     Args:
         teacher_model: Pretrained teacher model.
