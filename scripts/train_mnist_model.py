@@ -4,7 +4,7 @@ This script trains a teacher model on the MNIST dataset, generates adversarial e
 and evaluates the models' performance on both clean and adversarial data.
 
 To run the script you can use the command:
-ipython scripts/train_mnist_model.py -- --lr 0.001 --batch_size 128 --max_epochs 2 --temperature 20
+ipython scripts/train_mnist_model.py -- --lr 0.001 --batch_size 128 --max_epochs 2 --temperature 20 --num_samples 100
 
 """
 
@@ -59,6 +59,7 @@ def main(
     h: int,
     max_epochs: int,
     temperature: float,
+    num_samples: int,
 ):
     """
     Main function to train a teacher model on MNIST, generate adversarial examples, and evaluate the models.
@@ -70,6 +71,7 @@ def main(
         h (int): Height of the input images.
         max_epochs (int): Number of epochs to train the model.
         temperature (float): Temperature parameter for softmax scaling / distillation.
+        num_samples (int): Number of samples to use for generating adversarial examples.
     """
     ssl._create_default_https_context = ssl._create_stdlib_context
 
@@ -147,7 +149,6 @@ def main(
 
     # Select a small test subset to attack
     # adversarial attacks can be slow, so we only use a small subset of the test set
-    num_samples = 100
     # First shuffle
     indices = torch.randperm(len(testset.data))
     mnist_data_shuffled = mnist_data[indices]
@@ -164,16 +165,22 @@ def main(
     attack = FastGradientMethod(estimator=art_model_t, eps=0.4, eps_step=0.1, batch_size=32, minimal=True, targeted=False, summary_writer=True)
     x_adv_fgm = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
     visualize_adversarial(mnist_data_subset, x_adv_fgm, mnist_targets_subset)
+    show_difference(mnist_data_subset[0][0], x_adv_fgm[0][0], title="Fast-Gradient Method")
+
 
     LOGGER.info("Generating DeepFool Adversarial Examples")
     attack = DeepFool(classifier=art_model_t, epsilon=0.001, max_iter=50, batch_size=32)
     x_adv_deepfool = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
     visualize_adversarial(mnist_data_subset, x_adv_deepfool, mnist_targets_subset)
+    show_difference(mnist_data_subset[0][0], x_adv_deepfool[0][0], title="Deepfool Method")
+
 
     LOGGER.info("Generating One Pixel Adversarial Examples")
-    attack = PixelAttack(classifier=art_model_t, th=20, es=1, max_iter=50)   # Increase max_iter for better results
+    attack = PixelAttack(classifier=art_model_t, th=5, es=1, max_iter=50)   # Increase max_iter for better results
     x_adv_pixel = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
     visualize_adversarial(mnist_data_subset, x_adv_pixel, mnist_targets_subset)
+    show_difference(mnist_data_subset[0][0], x_adv_pixel[0][0], title="Pixel Method")
+
 
     # FSGM
     LOGGER.info(evaluate_adversarial_metrics(art_model_t.model, mnist_data_subset, mnist_targets_subset, x_adv_fgm, device='cpu'))
@@ -184,20 +191,12 @@ def main(
 
     ## Teacher Model
 
-    # Original test set evaluation
+    # Evaluate model on entire testset
     original_accuracy = evaluate_model(
-        art_model_t.model, mnist_data_subset, mnist_targets_subset, device=torch.device("cpu")
+        art_model_t.model, mnist_data, mnist_targets, device=torch.device("cpu")
     )
     LOGGER.info(f"Original Test Accuracy: {original_accuracy:.2f}%")
 
-    show_difference(mnist_data_subset[0][0], x_adv_fgm[0][0], title="Fast-Gradient Method")
-    show_difference(mnist_data_subset[0][0], x_adv_deepfool[0][0], title="Deepfool Method")
-    #show_difference(mnist_data_subset[0][0], x_adv_carlini[0][0], title="Carlini Method")
-    show_difference(mnist_data_subset[0][0], x_adv_pixel[0][0], title="Pixel Method")
-
-
-    # Generate soft labels for training the student
-    soft_labels = get_soft_labels(teacher_model, trainloader, temperature)
 
     LOGGER.info("Training Student Model")
     # Train the student model using knowledge distillation
@@ -215,9 +214,9 @@ def main(
 
     ## Student Model
 
-    # Original test set evaluation
+    # Evaluate model on entire testset
     original_accuracy = evaluate_model(
-        art_model_s.model, mnist_data_subset, mnist_targets_subset
+        art_model_s.model, mnist_data, mnist_targets, device=torch.device("mps")
     )
     LOGGER.info(f"Original Test Accuracy: {original_accuracy:.2f}%")
 
@@ -240,6 +239,7 @@ if __name__ == "__main__":
     parser.add_argument("--h", type=int, default=28, help="Height of the input images.")
     parser.add_argument("--max_epochs", type=int, default=50, help="Number of epochs.")
     parser.add_argument("--temperature", type=float, default=20, help="Temperature for soft labels.")
+    parser.add_argument("--num_samples", type=int, default=100, help="Number of samples for adversarial attacks.")
     args = parser.parse_args()
     # Call the main function with parsed arguments
     main(
@@ -250,4 +250,5 @@ if __name__ == "__main__":
         h=args.h,
         max_epochs=args.max_epochs,
         temperature=args.temperature,
+        num_samples=args.num_samples,
     )

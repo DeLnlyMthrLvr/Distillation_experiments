@@ -1,5 +1,4 @@
 notebooks/data/*
-models/*
 runs
 notebooks/runs/*
 notebooks/images/*
