@@ -42,7 +42,7 @@ def distillation_loss(student_logits, teacher_soft_labels, hard_labels, temp, al
     return alpha * soft_loss + (1 - alpha) * hard_loss
 
 
-## No distillation used here:
+
 def train_teacher(teacher_model, trainloader, criterion, optimizer, device, epochs, save_path="experiments/", model_name="teacher_model"):
     """
     Train the teacher model.
@@ -53,8 +53,9 @@ def train_teacher(teacher_model, trainloader, criterion, optimizer, device, epoc
     criterion: Loss function.
     optimizer: Optimizer for updating model weights.
     device: Device to perform training on (CPU or GPU).
-    max_epochs: Maximum number of training epochs.
+    epochs: Number of training epochs.
     save_path: Path to save the trained model.
+    model_name: Name of the model file.
 
     Returns:
     teacher_losses: List of loss values per epoch.
@@ -62,18 +63,10 @@ def train_teacher(teacher_model, trainloader, criterion, optimizer, device, epoc
 
     # Ensure the save path exists
     try:
-        # Create the parent directory if it doesn't exist
-        directory = os.path.dirname(save_path)
-        if directory and not os.path.exists(directory):
-            os.makedirs(directory)
-            print(f"Directory '{directory}' created.")
-
-        # Check if the file exists
-        file_exists = os.path.isfile(save_path)
-    
+        os.makedirs(save_path, exist_ok=True)
+        print(f"Directory '{save_path}' created or already exists.")
     except Exception as e:
-        print(f"Error while creating directory '{directory}': {e}")
-
+        print(f"Error while creating directory '{save_path}': {e}")
 
     teacher_losses = []
 
@@ -105,16 +98,17 @@ def train_teacher(teacher_model, trainloader, criterion, optimizer, device, epoc
             LOGGER.info(f"Epoch {epoch}/{epochs - 1}: Loss = {avg_loss:.4f}")
 
     # Create the full save path with model name
-    save_path = os.path.join(save_path, f"{model_name}.pth")
+    full_save_path = os.path.join(save_path, f"{model_name}.pth")
 
-        # Check if the model already exists at save_path
-    if not os.path.exists(save_path):
-        torch.save(teacher_model.state_dict(), save_path)
-        LOGGER.info(f"Model saved at {save_path}")
+    # Check if the model already exists at save_path
+    if not os.path.exists(full_save_path):
+        torch.save(teacher_model.state_dict(), full_save_path)
+        LOGGER.info(f"Model saved at {full_save_path}")
     else:
-        LOGGER.info(f"Model already exists at {save_path}, skipping save.")
+        LOGGER.info(f"Model already exists at {full_save_path}, skipping save.")
 
     return teacher_losses
+
 
 
 def load_model(model, device, load_path, model_name="teacher_model"):

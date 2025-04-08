@@ -145,10 +145,10 @@ def main(
 
     # Load the model
     teacher_model = load_model(
-        teacher_model, 
-        device=device, 
-        load_path=save_path, 
-        model_name="mnist_teacher_model"
+        teacher_model,
+        device=device,
+        load_path=save_path,
+        model_name="mnist_teacher_model",
     )
 
     # If the model is not loaded (returns None), train and save it
@@ -169,9 +169,6 @@ def main(
             save_path=save_path,
             model_name="mnist_teacher_model",
         )
-
-
-
 
     # Wrap in ART PyTorchClassifier
     art_model_t = PyTorchClassifier(

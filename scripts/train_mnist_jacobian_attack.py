@@ -1,11 +1,11 @@
 """
-Train a teacher model on MNIST, generate adversarial examples, and evaluate the models.
+Train a teacher model on MNIST and generate adversarial examples with Jacobian-Saliency method.
 
-This script trains a teacher model on the MNIST dataset, generates adversarial examples using various attacks,
+This script trains a teacher model on the MNIST dataset, generates adversarial examples,
 and evaluates the models' performance on both clean and adversarial data.
 
 To run the script you can use the following command, adjusting argumments as needed:
-ipython scripts/train_mnist_jacobian_attack.py -- --lr 0.001 --batch_size 256 --max_epochs 50 --temperature 20 --num_samples 100 --device 'mps'
+ipython scripts/train_mnist_jacobian_attack.py -- --lr 0.001 --batch_size 256 --max_epochs 5 --temperature 20 --num_samples 5 --device 'mps'
 
 
 """
@@ -32,17 +32,17 @@ from evaluation.metrics import evaluate_adversarial_metrics
 from evaluation.metrics import evaluate_model
 from processing.visualize import show_difference
 from processing.visualize import visualize_adversarial
-from processing.distillation import train_student, train_teacher
+from processing.distillation import train_student, train_teacher, load_model
 from evaluation.metrics import (
     calculate_mean_gradient_amplitude,
     calculate_binned_gradient_amplitude,
 )
 from utils.experiment_saver import save_experiment_results
+from utils.jsma_generate import generate_adversarial_samples
 
 
-from art.attacks.evasion.fast_gradient import FastGradientMethod
-from art.attacks.evasion.deepfool import DeepFool
-from art.attacks.evasion.pixel_threshold import PixelAttack
+from art.attacks.evasion.saliency_map import SaliencyMapMethod
+
 
 logging.basicConfig(
     level="INFO",
@@ -143,16 +143,32 @@ def main(
 
     ## Teacher Model
 
-    LOGGER.info("\nTraining Teacher Model")
-
-    teacher_losses = train_teacher(
+    # Load the model
+    teacher_model = load_model(
         teacher_model,
-        trainloader,
-        epochs=max_epochs,
-        criterion=criterion,
-        optimizer=optimizer,
         device=device,
+        load_path=save_path,
+        model_name="mnist_teacher_model",
     )
+
+    # If the model is not loaded (returns None), train and save it
+    if teacher_model is None:
+        LOGGER.info("\nTraining Teacher Model")
+
+        # Initialize the teacher model again
+        teacher_model = MnistNet(input_size=w, temperature=temperature).to(device)
+
+        # Train the teacher model
+        train_teacher(
+            teacher_model,
+            trainloader,
+            criterion=criterion,
+            optimizer=torch.optim.Adam(teacher_model.parameters(), lr=0.001),
+            device=device,
+            epochs=max_epochs,
+            save_path=save_path,
+            model_name="mnist_teacher_model",
+        )
 
     # Wrap in ART PyTorchClassifier
     art_model_t = PyTorchClassifier(
@@ -186,68 +202,36 @@ def main(
     # Generate Adversarial Examples from the Teacher Model
     LOGGER.info("\nGenerating Adversarial Examples from Teacher Model:")
 
-    LOGGER.info("Generating FSGM Adversarial Examples")
-    attack = FastGradientMethod(
-        estimator=art_model_t,
-        eps=0.4,
-        eps_step=0.1,
-        batch_size=32,
-        minimal=True,
-        targeted=False,
-        summary_writer=True,
-    )
-    x_adv_fgm = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
-    visualize_adversarial(mnist_data_subset, x_adv_fgm, mnist_targets_subset)
-    show_difference(
-        mnist_data_subset[0][0], x_adv_fgm[0][0], title="Fast-Gradient Method"
-    )
+    LOGGER.info("Generating Jacobian-Saliency Adversarial Examples")
 
-    LOGGER.info("Generating DeepFool Adversarial Examples")
-    attack = DeepFool(classifier=art_model_t, epsilon=0.001, max_iter=50, batch_size=32)
-    x_adv_deepfool = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
-    visualize_adversarial(mnist_data_subset, x_adv_deepfool, mnist_targets_subset)
-    show_difference(
-        mnist_data_subset[0][0], x_adv_deepfool[0][0], title="Deepfool Method"
-    )
+    expanded_data, expanded_labels, x_adv, y_adv = generate_adversarial_samples(mnist_data_subset, mnist_targets_subset, art_model_t, theta=0.8, gamma=0.7, batch_size=32)
 
-    LOGGER.info("Generating One Pixel Adversarial Examples")
-    attack = PixelAttack(classifier=art_model_t, th=5, es=1, max_iter=50)
-    x_adv_pixel = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
-    visualize_adversarial(mnist_data_subset, x_adv_pixel, mnist_targets_subset)
-    show_difference(mnist_data_subset[0][0], x_adv_pixel[0][0], title="Pixel Method")
+    print(f"Adversarial examples shape: {x_adv.shape}")
+    print(f"Adversarial labels shape: {y_adv.shape}")
+    print(f"Expanded labels shape: {expanded_labels.shape}")
+    print(f"Expanded data shape: {expanded_data.shape}")
+
+    visualize_adversarial(expanded_data, x_adv, mnist_targets_subset)
+    x_adv = x_adv.reshape(-1, n_channels, w, h)
+    show_difference(
+        expanded_data[0][0], x_adv[0][0], title="Jacobian-Saliency Map Method"
+    )
+    # Flatten
+    x_adv = x_adv.reshape(-1, n_channels, w, h)
+
 
     # Transfer model back to device
     teacher_model.to(device)
 
     # Evaluate the teacher model on adversarial examples
     LOGGER.info("Evaluating Teacher Model on Teacher-based Adversarial Examples:")
-    # FSGM
+
     LOGGER.info(
         evaluate_adversarial_metrics(
             art_model_t.model,
-            mnist_data_subset,
-            mnist_targets_subset,
-            x_adv_fgm,
-            device=device,
-        )
-    )
-    # DeepFool
-    LOGGER.info(
-        evaluate_adversarial_metrics(
-            art_model_t.model,
-            mnist_data_subset,
-            mnist_targets_subset,
-            x_adv_deepfool,
-            device=device,
-        )
-    )
-    # One Pixel Attack
-    LOGGER.info(
-        evaluate_adversarial_metrics(
-            art_model_t.model,
-            mnist_data_subset,
-            mnist_targets_subset,
-            x_adv_pixel,
+            expanded_data,
+            expanded_labels,
+            x_adv,
             device=device,
         )
     )
@@ -300,34 +284,14 @@ def main(
     LOGGER.info("\nGenerating Adversarial Examples from Student Model:")
 
     LOGGER.info("Generating FSGM Adversarial Examples")
-    attack = FastGradientMethod(
-        estimator=art_model_s,
-        eps=0.4,
-        eps_step=0.1,
-        batch_size=32,
-        minimal=True,
-        targeted=False,
-        summary_writer=True,
-    )
-    x_adv_fgm_s = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
-    visualize_adversarial(mnist_data_subset, x_adv_fgm_s, mnist_targets_subset)
-    show_difference(
-        mnist_data_subset[0][0], x_adv_fgm_s[0][0], title="Fast-Gradient Method"
-    )
 
-    LOGGER.info("Generating DeepFool Adversarial Examples")
-    attack = DeepFool(classifier=art_model_s, epsilon=0.001, max_iter=50, batch_size=32)
-    x_adv_deepfool_s = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
-    visualize_adversarial(mnist_data_subset, x_adv_deepfool_s, mnist_targets_subset)
-    show_difference(
-        mnist_data_subset[0][0], x_adv_deepfool_s[0][0], title="Deepfool Method"
-    )
+    expanded_data, expanded_labels, x_adv_s, y_adv_s = generate_adversarial_samples(mnist_data_subset, mnist_targets_subset, art_model_t, theta=0.8, gamma=0.7, batch_size=32)
 
-    LOGGER.info("Generating One Pixel Adversarial Examples")
-    attack = PixelAttack(classifier=art_model_s, th=5, es=1, max_iter=50)
-    x_adv_pixel_s = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
-    visualize_adversarial(mnist_data_subset, x_adv_pixel_s, mnist_targets_subset)
-    show_difference(mnist_data_subset[0][0], x_adv_pixel_s[0][0], title="Pixel Method")
+
+    visualize_adversarial(expanded_data, x_adv_s, mnist_targets_subset)
+    show_difference(
+        expanded_data[0][0], x_adv_s[0][0], title="Jacobian-Saliency Map Method"
+    )
 
     # Transfer model back to device
     student_model.to(device)
@@ -338,29 +302,9 @@ def main(
     LOGGER.info(
         evaluate_adversarial_metrics(
             art_model_s.model,
-            mnist_data_subset,
-            mnist_targets_subset,
-            x_adv_fgm_s,
-            device=device,
-        )
-    )
-    # DeepFool
-    LOGGER.info(
-        evaluate_adversarial_metrics(
-            art_model_s.model,
-            mnist_data_subset,
-            mnist_targets_subset,
-            x_adv_deepfool_s,
-            device=device,
-        )
-    )
-    # One Pixel Attack
-    LOGGER.info(
-        evaluate_adversarial_metrics(
-            art_model_s.model,
-            mnist_data_subset,
-            mnist_targets_subset,
-            x_adv_pixel_s,
+            expanded_data,
+            expanded_labels,
+            x_adv_s,
             device=device,
         )
     )
@@ -374,61 +318,23 @@ def main(
             art_model_s.model,
             mnist_data_subset,
             mnist_targets_subset,
-            x_adv_fgm,
+            x_adv,
             device=device,
         )
     )
-    # DeepFool
-    LOGGER.info(
-        evaluate_adversarial_metrics(
-            art_model_s.model,
-            mnist_data_subset,
-            mnist_targets_subset,
-            x_adv_deepfool,
-            device=device,
-        )
-    )
-    # One Pixel Attack
-    LOGGER.info(
-        evaluate_adversarial_metrics(
-            art_model_s.model,
-            mnist_data_subset,
-            mnist_targets_subset,
-            x_adv_pixel,
-            device=device,
-        )
-    )
+ 
     LOGGER.info("Evaluating Teacher Model on Student-based Adversarial Examples:")
     # FSGM
     LOGGER.info(
         evaluate_adversarial_metrics(
             art_model_t.model,
-            mnist_data_subset,
-            mnist_targets_subset,
-            x_adv_fgm_s,
+            expanded_data,
+            expanded_labels,
+            x_adv_s,
             device=device,
         )
     )
-    # DeepFool
-    LOGGER.info(
-        evaluate_adversarial_metrics(
-            art_model_t.model,
-            mnist_data_subset,
-            mnist_targets_subset,
-            x_adv_deepfool_s,
-            device=device,
-        )
-    )
-    # One Pixel Attack
-    LOGGER.info(
-        evaluate_adversarial_metrics(
-            art_model_t.model,
-            mnist_data_subset,
-            mnist_targets_subset,
-            x_adv_pixel_s,
-            device=device,
-        )
-    )
+
 
     # Save experiment results
     LOGGER.info("Saving experiment results")
@@ -442,14 +348,10 @@ def main(
             "Num Samples",
             "Accuracy (T)",
             "Mean Gradient Amplitude (T)",
-            "Metrics (FSGM)",
-            "Metrics (DeepFool)",
-            "Metrics (Pixel)",
+            "Metrics (JSMA)",
             "Accuracy (S)",
             "Mean Gradient Amplitude (S)",
-            "Metrics (FSGM)",
-            "Metrics (DeepFool)",
-            "Metrics (Pixel)",
+            "Metrics (JSMA)",
         ],
         [
             max_epochs,
@@ -463,23 +365,9 @@ def main(
             ),
             evaluate_adversarial_metrics(
                 art_model_t.model,
-                mnist_data_subset,
-                mnist_targets_subset,
-                x_adv_fgm,
-                device=device,
-            ),
-            evaluate_adversarial_metrics(
-                art_model_t.model,
-                mnist_data_subset,
-                mnist_targets_subset,
-                x_adv_deepfool,
-                device=device,
-            ),
-            evaluate_adversarial_metrics(
-                art_model_t.model,
-                mnist_data_subset,
-                mnist_targets_subset,
-                x_adv_pixel,
+                expanded_data,
+                expanded_labels,
+                x_adv,
                 device=device,
             ),
             student_accuracy,
@@ -488,23 +376,9 @@ def main(
             ),
             evaluate_adversarial_metrics(
                 art_model_s.model,
-                mnist_data_subset,
-                mnist_targets_subset,
-                x_adv_fgm_s,
-                device=device,
-            ),
-            evaluate_adversarial_metrics(
-                art_model_s.model,
-                mnist_data_subset,
-                mnist_targets_subset,
-                x_adv_deepfool_s,
-                device=device,
-            ),
-            evaluate_adversarial_metrics(
-                art_model_s.model,
-                mnist_data_subset,
-                mnist_targets_subset,
-                x_adv_pixel_s,
+                expanded_data,
+                expanded_labels,
+                x_adv_s,
                 device=device,
             ),
         ],
@@ -529,7 +403,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--save_path",
         type=str,
-        default="experiments/mnist_results.csv",
+        default="experiments_jsma",
         help="Path to save the experiment results.",
     )
     parser.add_argument(

@@ -1,7 +1,5 @@
-notebooks/data/*
+notebooks/
 runs
-notebooks/runs/*
-notebooks/images/*
 __pycache__/
 experiments/
 data/
