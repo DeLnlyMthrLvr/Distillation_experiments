@@ -29,13 +29,14 @@ def show_difference(original, adversarial, title="Method"):
     plt.show()
 
 
-def visualize_adversarial(data, adversarial_data, labels, num_samples=5):
+def visualize_adversarial(data, adversarial_data, labels, rgb=True, num_samples=5):
     """
     Displays a comparison of original and adversarial images for a subset of samples.
 
-    :param data: Original MNIST images (NumPy array or PyTorch Tensor) with shape (N, 1, 28, 28)
+    :param data: Original MNIST/CIFAR-10 images (NumPy array or PyTorch Tensor) with shape (N, 1, 28, 28)/(N, 3, 32, 32).
     :param adversarial_data: Adversarial MNIST images (same shape as `data`).
     :param labels: True labels for the images (can be one-hot or class indices).
+    :param rgb: If True, assumes the images are RGB. If False, assumes grayscale.
     :param num_samples: Number of samples to display.
     """
     if isinstance(data, torch.Tensor):  # Convert tensors to numpy
@@ -55,12 +56,18 @@ def visualize_adversarial(data, adversarial_data, labels, num_samples=5):
 
     for i, idx in enumerate(indices):
         # Original Image
-        axes[i, 0].imshow(data[idx].squeeze(), cmap="gray")
+        if rgb:
+            axes[i, 0].imshow(((np.transpose(data[idx].squeeze(), (1, 2, 0)))*255).astype(np.uint8))
+        else:
+            axes[i, 0].imshow(data[idx].squeeze(), cmap="gray")
         axes[i, 0].set_title(f"Original (Label: {labels[idx]})")
         axes[i, 0].axis("off")
 
         # Adversarial Image
-        axes[i, 1].imshow(adversarial_data[idx].squeeze(), cmap="gray")
+        if rgb:
+            axes[i, 1].imshow(((np.transpose(adversarial_data[idx].squeeze(), (1, 2, 0)))*255).astype(np.uint8))
+        else:
+            axes[i, 1].imshow(adversarial_data[idx].squeeze(), cmap="gray")
         axes[i, 1].set_title("Adversarial")
         axes[i, 1].axis("off")
 
@@ -68,13 +75,14 @@ def visualize_adversarial(data, adversarial_data, labels, num_samples=5):
     plt.show()
 
 
-def visualize_from_dataloader(model, dataloader, temp, device="cpu"):
+def visualize_from_dataloader(model, dataloader, temp, rgb=True, device="cpu"):
     """
     Selects a random MNIST image from the dataset, gets its label, and computes its soft labels.
 
     :param model: Trained teacher model.
     :param dataloader: PyTorch DataLoader containing the dataset.
     :param temp: Temperature parameter for soft labels.
+    :param rgb: If True, assumes the images are RGB. If False, assumes grayscale.
     :param device: Device to run the model on.
     """
     model.eval()
@@ -95,7 +103,10 @@ def visualize_from_dataloader(model, dataloader, temp, device="cpu"):
         soft_labels = torch.softmax(logits / temp, dim=1).cpu().numpy().flatten()
 
     # Display image and labels
-    plt.imshow(image.squeeze().cpu(), cmap="gray")  # Use grayscale colormap for MNIST
+    if rgb:
+        plt.imshow((((np.transpose(image.squeeze().cpu(), (1, 2, 0))+1.0)/2)*255).astype(np.uint8))
+    else:
+        plt.imshow(image.squeeze().cpu(), cmap="gray")  # Use grayscale colormap for MNIST
     plt.title(f"True Label: {label}\nSoft Labels: {soft_labels.round(2)}")
     plt.axis("off")
     plt.show()
