@@ -13,6 +13,10 @@ def save_experiment_results(file_path, headers, data):
         headers (list): List of column headers.
         data (list): List of data to write to the CSV file.
     """
+
+    # Create the full save path with model name
+    file_path = os.path.join(file_path, "experiment_results.csv") 
+    
     try:
         # Ensure headers and data are both lists and have the same length
         if not isinstance(headers, list) or not isinstance(data, list):

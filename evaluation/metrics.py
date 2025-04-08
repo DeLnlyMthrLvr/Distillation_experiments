@@ -89,11 +89,53 @@ def calculate_mean_gradient_amplitude(model, data, labels, criterion, device=Non
     loss.backward()
     gradients = data.grad.abs().cpu().numpy()
 
-    # Bin gradients into 10 bins
-    bins = np.linspace(0, gradients.max(), 11)
-    bin_counts, _ = np.histogram(gradients, bins=bins)
-    mean_gradient_amplitude = bin_counts / len(labels)
-    return mean_gradient_amplitude.tolist()
+    mean_gradient_amplitude = gradients.mean(axis=(0, 1, 2, 3))
+    return mean_gradient_amplitude
+
+
+def calculate_binned_gradient_amplitude(
+    model, data, labels, criterion, num_bins=10, device=None
+):
+    """
+    Calculate Mean Gradient Amplitude divided into bins.
+    Args:
+        model: PyTorch model.
+        data: Input samples (Tensor).
+        labels: True labels (Tensor).
+        criterion: Loss function.
+        num_bins: Number of bins to divide the gradient amplitudes.
+        device: Device (cpu or cuda).
+    Returns:
+        bin_counts (list): List of counts of samples in each gradient amplitude bin.
+    """
+    if device is None:
+        device = "cpu"
+    model.to(device)
+    model.eval()
+
+    # Convert data to PyTorch tensors if needed
+    data = to_tensor(data, device)
+    labels = to_tensor(labels, device).long()
+
+    # Enable gradient calculation
+    data.requires_grad = True
+
+    # Forward pass
+    outputs = model(data)
+    loss = criterion(outputs, labels)
+    loss.backward()
+
+    # Calculate mean gradient amplitude for each sample
+    gradients = data.grad.abs().view(len(data), -1)
+    mean_gradients = gradients.mean(dim=1).cpu().numpy()
+
+    # Create bins and calculate histogram
+    bin_edges = np.logspace(
+        -40, 0, num_bins + 1
+    )  # Logarithmic scale for better representation
+    bin_counts, _ = np.histogram(mean_gradients, bins=bin_edges)
+
+    return bin_counts, bin_edges
 
 
 def calculate_robustness(data, adv_data):
@@ -108,16 +150,7 @@ def calculate_robustness(data, adv_data):
     """
     perturbations = (adv_data - data).view(len(data), -1).norm(p=2, dim=1)
     robustness = perturbations.mean().item()
-
-    # Compute Average maximum perturbation (Normalized images)
-    n_channels, w, h = data.shape[1], data.shape[2], data.shape[3]
-
-    # Calculate the product of the last three dimensions
-    max_robustness = n_channels * w * h
-
-    robustness_ratio = (robustness / max_robustness) * 100
-
-    return robustness_ratio
+    return robustness
 
 
 def calculate_adversarial_confidence(outputs_adv):

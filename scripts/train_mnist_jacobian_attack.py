@@ -5,7 +5,7 @@ This script trains a teacher model on the MNIST dataset, generates adversarial e
 and evaluates the models' performance on both clean and adversarial data.
 
 To run the script you can use the following command, adjusting argumments as needed:
-ipython scripts/train_mnist_model.py -- --lr 0.001 --batch_size 256 --max_epochs 50 --temperature 20 --num_samples 100 --device 'mps'
+ipython scripts/train_mnist_jacobian_attack.py -- --lr 0.001 --batch_size 256 --max_epochs 50 --temperature 20 --num_samples 100 --device 'mps'
 
 
 """
@@ -32,7 +32,7 @@ from evaluation.metrics import evaluate_adversarial_metrics
 from evaluation.metrics import evaluate_model
 from processing.visualize import show_difference
 from processing.visualize import visualize_adversarial
-from processing.distillation import train_student, train_teacher, load_model
+from processing.distillation import train_student, train_teacher
 from evaluation.metrics import (
     calculate_mean_gradient_amplitude,
     calculate_binned_gradient_amplitude,
@@ -143,35 +143,16 @@ def main(
 
     ## Teacher Model
 
-    # Load the model
-    teacher_model = load_model(
-        teacher_model, 
-        device=device, 
-        load_path=save_path, 
-        model_name="mnist_teacher_model"
+    LOGGER.info("\nTraining Teacher Model")
+
+    teacher_losses = train_teacher(
+        teacher_model,
+        trainloader,
+        epochs=max_epochs,
+        criterion=criterion,
+        optimizer=optimizer,
+        device=device,
     )
-
-    # If the model is not loaded (returns None), train and save it
-    if teacher_model is None:
-        LOGGER.info("\nTraining Teacher Model")
-
-        # Initialize the teacher model again
-        teacher_model = MnistNet(input_size=w, temperature=temperature).to(device)
-
-        # Train the teacher model
-        train_teacher(
-            teacher_model,
-            trainloader,
-            criterion=criterion,
-            optimizer=torch.optim.Adam(teacher_model.parameters(), lr=0.001),
-            device=device,
-            epochs=max_epochs,
-            save_path=save_path,
-            model_name="mnist_teacher_model",
-        )
-
-
-
 
     # Wrap in ART PyTorchClassifier
     art_model_t = PyTorchClassifier(
@@ -548,7 +529,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--save_path",
         type=str,
-        default="experiments/",
+        default="experiments/mnist_results.csv",
         help="Path to save the experiment results.",
     )
     parser.add_argument(

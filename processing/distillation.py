@@ -3,6 +3,7 @@ from torch import nn
 from tqdm import tqdm
 import torch.optim as optim
 import logging
+import os 
 
 
 LOGGER = logging.getLogger(__name__)
@@ -42,7 +43,7 @@ def distillation_loss(student_logits, teacher_soft_labels, hard_labels, temp, al
 
 
 ## No distillation used here:
-def train_teacher(teacher_model, trainloader, criterion, optimizer, device, epochs):
+def train_teacher(teacher_model, trainloader, criterion, optimizer, device, epochs, save_path="experiments/", model_name="teacher_model"):
     """
     Train the teacher model.
 
@@ -53,10 +54,27 @@ def train_teacher(teacher_model, trainloader, criterion, optimizer, device, epoc
     optimizer: Optimizer for updating model weights.
     device: Device to perform training on (CPU or GPU).
     max_epochs: Maximum number of training epochs.
+    save_path: Path to save the trained model.
 
     Returns:
     teacher_losses: List of loss values per epoch.
     """
+
+    # Ensure the save path exists
+    try:
+        # Create the parent directory if it doesn't exist
+        directory = os.path.dirname(save_path)
+        if directory and not os.path.exists(directory):
+            os.makedirs(directory)
+            print(f"Directory '{directory}' created.")
+
+        # Check if the file exists
+        file_exists = os.path.isfile(save_path)
+    
+    except Exception as e:
+        print(f"Error while creating directory '{directory}': {e}")
+
+
     teacher_losses = []
 
     teacher_model.to(device)
@@ -86,7 +104,49 @@ def train_teacher(teacher_model, trainloader, criterion, optimizer, device, epoc
         if epoch % 10 == 0 or epoch == epochs - 1:
             LOGGER.info(f"Epoch {epoch}/{epochs - 1}: Loss = {avg_loss:.4f}")
 
+    # Create the full save path with model name
+    save_path = os.path.join(save_path, f"{model_name}.pth")
+
+        # Check if the model already exists at save_path
+    if not os.path.exists(save_path):
+        torch.save(teacher_model.state_dict(), save_path)
+        LOGGER.info(f"Model saved at {save_path}")
+    else:
+        LOGGER.info(f"Model already exists at {save_path}, skipping save.")
+
     return teacher_losses
+
+
+def load_model(model, device, load_path, model_name="teacher_model"):
+    """
+    Load the model from the specified path if it exists.
+
+    Parameters:
+    model: The PyTorch model to load the state into.
+    device: Device to load the model onto (CPU or GPU).
+    load_path: Path from where to load the model.
+
+    Returns:
+    model: The loaded model or None if not found.
+    """
+    # Create the full save path with model name
+    full_path = os.path.join(load_path, f"{model_name}.pth")
+
+    if os.path.exists(full_path):
+        try:
+            state_dict = torch.load(full_path, map_location=device)
+            model.load_state_dict(state_dict, strict=False)
+            model.to(device)
+            LOGGER.info(f"Model loaded successfully from {full_path}")
+            return model
+        except Exception as e:
+            LOGGER.error(f"Error loading model: {e}")
+            return None
+    else:
+        LOGGER.warning(f"Model not found at {full_path}.")
+        return None
+
+    
 
 
 def train_student(
@@ -125,7 +185,7 @@ def train_student(
     student_model.train()
     teacher_model.eval()  # Ensure teacher is in evaluation mode (no gradients)
 
-    optimizer = optim.Adam(student_model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(student_model.parameters(), lr=lr)
     student_losses = []
 
     for epoch in tqdm(range(epochs)):
@@ -136,9 +196,7 @@ def train_student(
             # Get teacher soft labels (detach to prevent gradient flow)
             with torch.no_grad():
                 teacher_logits = teacher_model(images)
-                soft_labels = torch.softmax(
-                    teacher_logits / temperature, dim=1
-                )  # Soft labels directly
+                soft_labels = torch.softmax(teacher_logits / temperature, dim=1)
 
             # Get student predictions
             student_logits = student_model(images)
@@ -162,6 +220,7 @@ def train_student(
             LOGGER.info(f"Epoch {epoch}/{epochs - 1}: Loss = {avg_loss:.4f}")
 
     return student_losses
+
 
 
 def train_student_two_losses(
