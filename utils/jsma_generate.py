@@ -1,5 +1,6 @@
 import torch
 from art.attacks.evasion import SaliencyMapMethod
+from tqdm import trange
 
 def generate_adversarial_samples(data, labels, art_model, N=10, theta=0.8, gamma=0.7, batch_size=32):
     """
@@ -26,9 +27,9 @@ def generate_adversarial_samples(data, labels, art_model, N=10, theta=0.8, gamma
     adversarial_targets = []
 
     # Create the attack method
-    attack = SaliencyMapMethod(classifier=art_model, theta=theta, gamma=gamma, batch_size=batch_size)
+    attack = SaliencyMapMethod(classifier=art_model, theta=theta, gamma=gamma, batch_size=batch_size, verbose=False)
 
-    for i in range(len(data)):
+    for i in trange(len(data), desc='JSMA'):
         original_sample = data[i:i+1]  # Keep as batch for ART compatibility
         original_label = labels[i]
 

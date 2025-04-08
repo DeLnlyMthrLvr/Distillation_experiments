@@ -39,6 +39,7 @@ def visualize_adversarial(data, adversarial_data, labels, rgb=True, num_samples=
     :param rgb: If True, assumes the images are RGB. If False, assumes grayscale.
     :param num_samples: Number of samples to display.
     """
+
     if isinstance(data, torch.Tensor):  # Convert tensors to numpy
         data = data.cpu().numpy()
     if isinstance(adversarial_data, torch.Tensor):
