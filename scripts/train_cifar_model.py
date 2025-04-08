@@ -5,7 +5,7 @@ This script trains a teacher model on the Cifar-10 dataset, generates adversaria
 and evaluates the models' performance on both clean and adversarial data.
 
 To run the script you can use the following command, adjusting argumments as needed:
-ipython scripts/train_cifar_model.py -- --lr 0.001 --batch_size 256 --max_epochs 20 --temperature 20 --num_samples 100 --device 'mps'
+ipython scripts/train_cifar_model.py -- --lr 0.001 --batch_size 256 --max_epochs 2 --temperature 20 --num_samples 2 --device 'mps'
 
 """
 
@@ -322,7 +322,7 @@ def main(
     student_model.to(device)
 
     # Evaluate the teacher model on adversarial examples
-    LOGGER.info("Evaluating Teacher Model on Teacher-based Adversarial Examples:")
+    LOGGER.info("Evaluating Student Model on Student-based Adversarial Examples:")
     # FSGM
     LOGGER.info(
         evaluate_adversarial_metrics(

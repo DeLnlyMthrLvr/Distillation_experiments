@@ -202,6 +202,7 @@ def main(
     # Generate Adversarial Examples from the Teacher Model
     LOGGER.info("\nGenerating Adversarial Examples from Teacher Model:")
 
+<<<<<<< HEAD
     LOGGER.info("Generating Jacobian-Saliency Adversarial Examples")
 
     expanded_data, expanded_labels, x_adv, y_adv = generate_adversarial_samples(mnist_data_subset, mnist_targets_subset, art_model_t, theta=0.8, gamma=0.7, batch_size=32)
@@ -219,6 +220,37 @@ def main(
     # Flatten
     x_adv = x_adv.reshape(-1, n_channels, w, h)
 
+=======
+    LOGGER.info("Generating FSGM Adversarial Examples")
+    attack = FastGradientMethod(
+        estimator=art_model_t,
+        eps=0.4,
+        eps_step=0.1,
+        batch_size=32,
+        minimal=True,
+        targeted=False,
+        summary_writer=True,
+    )
+    x_adv_fgm = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
+    visualize_adversarial(mnist_data_subset, x_adv_fgm, mnist_targets_subset, rgb=False)
+    show_difference(
+        mnist_data_subset[0][0], x_adv_fgm[0][0], title="Fast-Gradient Method"
+    )
+
+    LOGGER.info("Generating DeepFool Adversarial Examples")
+    attack = DeepFool(classifier=art_model_t, epsilon=0.001, max_iter=50, batch_size=32)
+    x_adv_deepfool = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
+    visualize_adversarial(mnist_data_subset, x_adv_deepfool, mnist_targets_subset, rgb=False)
+    show_difference(
+        mnist_data_subset[0][0], x_adv_deepfool[0][0], title="Deepfool Method"
+    )
+
+    LOGGER.info("Generating One Pixel Adversarial Examples")
+    attack = PixelAttack(classifier=art_model_t, th=5, es=1, max_iter=50)
+    x_adv_pixel = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
+    visualize_adversarial(mnist_data_subset, x_adv_pixel, mnist_targets_subset, rgb=False)
+    show_difference(mnist_data_subset[0][0], x_adv_pixel[0][0], title="Pixel Method")
+>>>>>>> 733ed021a6126b4ec004908fb641e8859adf5cf3
 
     # Transfer model back to device
     teacher_model.to(device)
@@ -284,6 +316,7 @@ def main(
     LOGGER.info("\nGenerating Adversarial Examples from Student Model:")
 
     LOGGER.info("Generating FSGM Adversarial Examples")
+<<<<<<< HEAD
 
     expanded_data, expanded_labels, x_adv_s, y_adv_s = generate_adversarial_samples(mnist_data_subset, mnist_targets_subset, art_model_t, theta=0.8, gamma=0.7, batch_size=32)
 
@@ -292,6 +325,36 @@ def main(
     show_difference(
         expanded_data[0][0], x_adv_s[0][0], title="Jacobian-Saliency Map Method"
     )
+=======
+    attack = FastGradientMethod(
+        estimator=art_model_s,
+        eps=0.4,
+        eps_step=0.1,
+        batch_size=32,
+        minimal=True,
+        targeted=False,
+        summary_writer=True,
+    )
+    x_adv_fgm_s = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
+    visualize_adversarial(mnist_data_subset, x_adv_fgm_s, mnist_targets_subset, rgb=False)
+    show_difference(
+        mnist_data_subset[0][0], x_adv_fgm_s[0][0], title="Fast-Gradient Method"
+    )
+
+    LOGGER.info("Generating DeepFool Adversarial Examples")
+    attack = DeepFool(classifier=art_model_s, epsilon=0.001, max_iter=50, batch_size=32)
+    x_adv_deepfool_s = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
+    visualize_adversarial(mnist_data_subset, x_adv_deepfool_s, mnist_targets_subset, rgb=False)
+    show_difference(
+        mnist_data_subset[0][0], x_adv_deepfool_s[0][0], title="Deepfool Method"
+    )
+
+    LOGGER.info("Generating One Pixel Adversarial Examples")
+    attack = PixelAttack(classifier=art_model_s, th=5, es=1, max_iter=50)
+    x_adv_pixel_s = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
+    visualize_adversarial(mnist_data_subset, x_adv_pixel_s, mnist_targets_subset, rgb=False)
+    show_difference(mnist_data_subset[0][0], x_adv_pixel_s[0][0], title="Pixel Method")
+>>>>>>> 733ed021a6126b4ec004908fb641e8859adf5cf3
 
     # Transfer model back to device
     student_model.to(device)
