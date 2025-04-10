@@ -5,7 +5,7 @@ This script trains a teacher model on the MNIST dataset, generates adversarial e
 and evaluates the models' performance on both clean and adversarial data.
 
 To run the script you can use the following command, adjusting argumments as needed:
-ipython scripts/train_mnist_jacobian_attack.py -- --lr 0.001 --batch_size 256 --max_epochs 50 --temperature 20 --num_samples 100 --device 'mps'
+ipython scripts/train_mnist_jacobian_attack.py -- --lr 0.001 --batch_size 128 --max_epochs 10 --temperature 30 --num_samples 20 --device 'mps'
 
 
 """
@@ -39,6 +39,7 @@ from evaluation.metrics import (
 )
 from utils.experiment_saver import save_experiment_results
 from utils.jsma_generate import generate_adversarial_samples
+from processing.distillation import soft_cross_entropy
 
 
 from art.attacks.evasion.saliency_map import SaliencyMapMethod
@@ -120,11 +121,14 @@ def main(
     )
 
     # Define a simple CNN model for MNIST classification
-    teacher_model = MnistNet(input_size=w, temperature=temperature).to(device)
-    student_model = MnistNet(input_size=w, temperature=temperature).to(device)
+    teacher_model = MnistNet(input_size=w, temperature=temperature, raw_logits=True).to(device)
+    student_model = MnistNet(input_size=w, temperature=temperature, raw_logits=False).to(device)
 
     # Specify the loss function and optimizer for teacher model
     criterion = nn.CrossEntropyLoss()
+    criterion_dist = nn.KLDivLoss(reduction="batchmean", log_target=True)
+    #criterion_dist = lambda student_logits, soft_labels: soft_cross_entropy(student_logits, soft_labels, temperature) * temperature * temperature
+
     optimizer = optim.AdamW(teacher_model.parameters(), lr=lr)
 
     # Get seperate vars for targets and data
@@ -143,12 +147,14 @@ def main(
 
     ## Teacher Model
 
+    teacher_name = f"mnist_teacher_model_temp{temperature}_ep{max_epochs}_lr{lr}_batch{batch_size}"
+
     # Load the model
     teacher_model = load_model(
         teacher_model,
         device=device,
         load_path=save_path,
-        model_name="mnist_teacher_model",
+        model_name=teacher_name,
     )
 
     # If the model is not loaded (returns None), train and save it
@@ -156,19 +162,26 @@ def main(
         LOGGER.info("\nTraining Teacher Model")
 
         # Initialize the teacher model again
-        teacher_model = MnistNet(input_size=w, temperature=temperature).to(device)
+        teacher_model = MnistNet(input_size=w, temperature=temperature, raw_logits=True).to(device)
 
         # Train the teacher model
         train_teacher(
             teacher_model,
             trainloader,
             criterion=criterion,
-            optimizer=torch.optim.Adam(teacher_model.parameters(), lr=0.001),
+            optimizer=torch.optim.Adam(teacher_model.parameters(), lr=lr),
             device=device,
             epochs=max_epochs,
             save_path=save_path,
-            model_name="mnist_teacher_model",
+            model_name=teacher_name,
         )
+
+    # Set to evaluation mode
+    teacher_model.eval()
+    # Set model temperature to 1 after training
+    teacher_model.temperature = 1.0
+    # Apply softmax probabilities during inference
+    teacher_model.raw_logits = False
 
     # Wrap in ART PyTorchClassifier
     art_model_t = PyTorchClassifier(
@@ -180,11 +193,15 @@ def main(
         nb_classes=n_labels,
     )
 
+
     # Evaluate model on entire testset
     teacher_accuracy = evaluate_model(
         art_model_t.model, mnist_data, mnist_targets, device=device
     )
     LOGGER.info(f"Test Accuracy: {teacher_accuracy:.2f}%")
+
+    # Criterion needs logits
+    teacher_model.raw_logits = True
 
     # Display Gradient Amplitude
     LOGGER.info(
@@ -194,13 +211,16 @@ def main(
         f"Binned Mean Gradient Amplitude (as implemented in Paparnot et. al 2016): {calculate_binned_gradient_amplitude(art_model_t.model, mnist_data, mnist_targets, criterion, device=device)}"
     )
 
+    # Apply softmax probabilities during inference
+    teacher_model.raw_logits = False
+
     # Adversarial attacks
     # Generate Adversarial Examples from the Teacher Model
     LOGGER.info("\nGenerating Adversarial Examples from Teacher Model:")
 
     LOGGER.info("Generating Jacobian-Saliency Adversarial Examples")
 
-    expanded_data, expanded_labels, x_adv, y_adv = generate_adversarial_samples(mnist_data_subset, mnist_targets_subset, art_model_t, theta=0.8, gamma=0.7, batch_size=32, device=device)
+    expanded_data, expanded_labels, x_adv, y_adv = generate_adversarial_samples(mnist_data_subset, mnist_targets_subset, art_model_t, theta=0.4, gamma=0.5, batch_size=32, device=device)
 
     visualize_adversarial(expanded_data, x_adv, expanded_labels, rgb=False)
     x_adv = x_adv.reshape(-1, n_channels, w, h)
@@ -231,12 +251,18 @@ def main(
         teacher_model,
         student_model,
         trainloader,
-        criterion=criterion,
+        criterion=criterion_dist,
         epochs=max_epochs,
         lr=lr,
         temperature=temperature,
         device=device,
     )
+
+    # Set to evaluation mode
+    student_model.eval()   
+    # Set model temperature to 1 after training
+    student_model.temperature = 1.0
+
 
     # Wrap in ART PyTorchClassifier
     art_model_s = PyTorchClassifier(
@@ -254,6 +280,9 @@ def main(
     )
     LOGGER.info(f"Test Accuracy: {student_accuracy:.2f}%")
 
+    # Criterion needs logits
+    student_model.raw_logits = True 
+
     # Display Gradient Amplitude
     LOGGER.info(
         f"Mean Gradient Amplitude: {calculate_mean_gradient_amplitude(art_model_s.model, mnist_data, mnist_targets, criterion, device=device)}"
@@ -268,7 +297,7 @@ def main(
 
     LOGGER.info("Generating Jacobian-Saliency Adversarial Examples")
 
-    expanded_data, expanded_labels, x_adv_s, y_adv_s = generate_adversarial_samples(mnist_data_subset, mnist_targets_subset, art_model_s, theta=0.8, gamma=0.7, batch_size=32, device=device)
+    expanded_data, expanded_labels, x_adv_s, y_adv_s = generate_adversarial_samples(mnist_data_subset, mnist_targets_subset, art_model_s, theta=0.4, gamma=0.5, batch_size=32, device=device)
 
 
     visualize_adversarial(expanded_data, x_adv_s, expanded_labels, rgb=False)
@@ -278,6 +307,9 @@ def main(
 
     # Transfer model back to device
     student_model.to(device)
+
+    # Apply softmax probabilities during inference
+    student_model.raw_logits = False
 
     # Evaluate the student model on adversarial examples
     LOGGER.info("Evaluating Student Model on Student-based Adversarial Examples:")

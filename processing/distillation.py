@@ -4,6 +4,7 @@ from tqdm import tqdm
 import torch.optim as optim
 import logging
 import os 
+from torch.nn import functional as F
 
 
 LOGGER = logging.getLogger(__name__)
@@ -80,7 +81,8 @@ def train_teacher(teacher_model, trainloader, criterion, optimizer, device, epoc
 
             # Forward pass
             logits = teacher_model(images)
-            loss = criterion(logits, labels)
+            scaled_logits = logits / teacher_model.temperature
+            loss = criterion(scaled_logits, labels)
 
             # Backward pass
             optimizer.zero_grad()
@@ -141,6 +143,9 @@ def load_model(model, device, load_path, model_name="teacher_model"):
         return None
 
     
+def soft_cross_entropy(student_logits, soft_labels, T):
+    student_log_probs = F.log_softmax(student_logits / T, dim=1)
+    return -(soft_labels * student_log_probs).sum(dim=1).mean()
 
 
 def train_student(
@@ -160,7 +165,7 @@ def train_student(
         teacher_model: Pretrained teacher model.
         student_model: Student model to train.
         trainloader: DataLoader for training.
-        criterion: Loss function.
+        criterion: Defined soft cross entropy function.
         epochs: Number of training epochs.
         lr: Learning rate.
         temperature: Temperature applied for soft labels.

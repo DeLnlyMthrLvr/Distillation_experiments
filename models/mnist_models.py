@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 
 class MnistNet(nn.Module):
-    def __init__(self, input_size=28, temperature=1):  # Add input size for flexibility
+    def __init__(self, input_size=28, temperature=1, raw_logits=True):  # Add input size for flexibility
         """
         A simple CNN model for MNIST classification.
         Args:
@@ -28,6 +28,7 @@ class MnistNet(nn.Module):
         self.activation = nn.ReLU()
 
         self.temperature = temperature
+        self.raw_logits = raw_logits
 
     def _get_conv_output(self, size):
         """Helper function to compute the output size after convolutions"""
@@ -47,7 +48,8 @@ class MnistNet(nn.Module):
         x = self.flatten(x)  # Flatten before FC layers
         x = self.activation(self.fc1(x))
         x = self.fc2(x)
-        x = F.log_softmax(
-            x / self.temperature, dim=1
-        )  # Use log_softmax for numerical stability
+        if self.raw_logits is False:
+            x = F.log_softmax(
+                x / self.temperature, dim=1
+            )  # Use log_softmax for numerical stability
         return x
