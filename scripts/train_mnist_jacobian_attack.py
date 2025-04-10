@@ -5,7 +5,7 @@ This script trains a teacher model on the MNIST dataset, generates adversarial e
 and evaluates the models' performance on both clean and adversarial data.
 
 To run the script you can use the following command, adjusting argumments as needed:
-ipython scripts/train_mnist_jacobian_attack.py -- --lr 0.001 --batch_size 256 --max_epochs 5 --temperature 20 --num_samples 5 --device 'mps'
+ipython scripts/train_mnist_jacobian_attack.py -- --lr 0.001 --batch_size 256 --max_epochs 50 --temperature 20 --num_samples 100 --device 'mps'
 
 
 """
@@ -194,17 +194,13 @@ def main(
         f"Binned Mean Gradient Amplitude (as implemented in Paparnot et. al 2016): {calculate_binned_gradient_amplitude(art_model_t.model, mnist_data, mnist_targets, criterion, device=device)}"
     )
 
-    # Ensure teacher model is not on mps to create the attacks
-    if device == "mps":
-        teacher_model.to("cpu")
-
     # Adversarial attacks
     # Generate Adversarial Examples from the Teacher Model
     LOGGER.info("\nGenerating Adversarial Examples from Teacher Model:")
 
     LOGGER.info("Generating Jacobian-Saliency Adversarial Examples")
 
-    expanded_data, expanded_labels, x_adv, y_adv = generate_adversarial_samples(mnist_data_subset, mnist_targets_subset, art_model_t, theta=0.8, gamma=0.7, batch_size=32)
+    expanded_data, expanded_labels, x_adv, y_adv = generate_adversarial_samples(mnist_data_subset, mnist_targets_subset, art_model_t, theta=0.8, gamma=0.7, batch_size=32, device=device)
 
     visualize_adversarial(expanded_data, x_adv, expanded_labels, rgb=False)
     x_adv = x_adv.reshape(-1, n_channels, w, h)
@@ -213,10 +209,6 @@ def main(
     )
     # Flatten
     x_adv = x_adv.reshape(-1, n_channels, w, h)
-
-
-    # Transfer model back to device
-    teacher_model.to(device)
 
     # Evaluate the teacher model on adversarial examples
     LOGGER.info("Evaluating Teacher Model on Teacher-based Adversarial Examples:")
@@ -269,18 +261,14 @@ def main(
     LOGGER.info(
         f"Binned Mean Gradient Amplitude (as implemented in Paparnot et. al 2016): {calculate_binned_gradient_amplitude(art_model_s.model, mnist_data, mnist_targets, criterion, device=device)}"
     )
-
-    # Ensure student model is not on mps to create the attacks
-    if device == "mps":
-        student_model.to("cpu")
-
+    
     # Adversarial attacks
     # Generate Adversarial Examples from the Student Model
     LOGGER.info("\nGenerating Adversarial Examples from Student Model:")
 
     LOGGER.info("Generating FSGM Adversarial Examples")
 
-    expanded_data, expanded_labels, x_adv_s, y_adv_s = generate_adversarial_samples(mnist_data_subset, mnist_targets_subset, art_model_t, theta=0.8, gamma=0.7, batch_size=32)
+    expanded_data, expanded_labels, x_adv_s, y_adv_s = generate_adversarial_samples(mnist_data_subset, mnist_targets_subset, art_model_t, theta=0.8, gamma=0.7, batch_size=32, device=device)
 
 
     visualize_adversarial(expanded_data, x_adv_s, expanded_labels, rgb=False)

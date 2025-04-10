@@ -2,13 +2,13 @@ import torch
 from art.attacks.evasion import SaliencyMapMethod
 from tqdm import trange
 
-def generate_adversarial_samples(data, labels, art_model, N=10, theta=0.8, gamma=0.7, batch_size=32):
+def generate_adversarial_samples(data, labels, art_model, N=10, theta=0.8, gamma=0.7, batch_size=32, device=None):
     """
     Generate adversarial samples using the Saliency Map Method (JSMA).
 
     Args:
-        data (torch.Tensor): Input data (images).
-        labels (torch.Tensor): True labels for the data.
+        data (np.array): Input data (images).
+        labels (np.array): True labels for the data.
         art_model: ART model for generating adversarial samples.
         N : Number of classes.
         theta : Parameter for the attack.
@@ -21,6 +21,14 @@ def generate_adversarial_samples(data, labels, art_model, N=10, theta=0.8, gamma
         adversarial_data (torch.Tensor): Generated adversarial samples.
         adversarial_targets (torch.Tensor): Target labels for the adversarial samples.
     """
+
+
+    if device is None:
+        device = "cpu"
+    elif device=='mps':
+        art_model.model.to('cpu')
+
+
     adversarial_data = []
     expanded_data = []
     expanded_labels = []
@@ -51,5 +59,8 @@ def generate_adversarial_samples(data, labels, art_model, N=10, theta=0.8, gamma
     expanded_data = torch.stack(expanded_data)
     expanded_labels = torch.tensor(expanded_labels)
     adversarial_targets = torch.tensor(adversarial_targets)
+
+    # Return model to device if mps
+    art_model.model.to(device)
 
     return expanded_data, expanded_labels, adversarial_data, adversarial_targets

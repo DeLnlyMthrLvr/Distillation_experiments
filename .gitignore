@@ -1,6 +1,13 @@
+# No notebooks
 notebooks/
+# No runs
 runs
+# No pycache
 __pycache__/
+# No experiment csv and models
 experiments/
+experiment_jsma/
+# No data
 data/
+# git stuff
 .DS_Store
