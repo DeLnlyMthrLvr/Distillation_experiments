@@ -205,7 +205,7 @@ def main(
 
     LOGGER.info("Generating Jacobian-Saliency Adversarial Examples")
 
-    expanded_data, expanded_labels, x_adv, y_adv = generate_adversarial_samples(cifar_data_subset, cifar_targets_subset, art_model_t, theta=0.8, gamma=0.7, batch_size=32, device=device)
+    expanded_data, expanded_labels, x_adv, y_adv = generate_adversarial_samples(cifar_data_subset, cifar_targets_subset, art_model_t, theta=0.4, gamma=0.5, batch_size=32, device=device)
 
     visualize_adversarial(expanded_data, x_adv, expanded_labels)
     show_difference(
@@ -279,7 +279,7 @@ def main(
 
     LOGGER.info("Generating Jacobian-Saliency Adversarial Examples")
 
-    expanded_data, expanded_labels, x_adv_s, y_adv = generate_adversarial_samples(cifar_data_subset, cifar_targets_subset, art_model_s, theta=0.8, gamma=0.7, batch_size=32, device=device)
+    expanded_data, expanded_labels, x_adv_s, y_adv = generate_adversarial_samples(cifar_data_subset, cifar_targets_subset, art_model_s, theta=0.4, gamma=0.5, batch_size=32, device=device)
 
 
     visualize_adversarial(expanded_data, x_adv_s, expanded_labels)
