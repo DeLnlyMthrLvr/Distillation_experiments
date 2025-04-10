@@ -118,11 +118,13 @@ def main(
     )
 
     # Define a simple CNN model for CIFAR-10 classification
-    teacher_model = Cifar10Net(input_size=w, temperature=temperature).to(device)
-    student_model = Cifar10Net(input_size=w, temperature=temperature).to(device)
+    teacher_model = Cifar10Net(input_size=w, temperature=temperature, raw_logits=True).to(device)
+    student_model = Cifar10Net(input_size=w, temperature=temperature, raw_logits=False).to(device)
 
     # Specify the loss function and optimizer for teacher model
     criterion = nn.CrossEntropyLoss()
+    criterion_dist = nn.KLDivLoss(reduction="batchmean", log_target=True)
+
     optimizer = optim.AdamW(teacher_model.parameters(), lr=lr)
 
     # Convert list to tensor first, then change to int and numpy
@@ -142,16 +144,27 @@ def main(
 
     ## Teacher Model
 
+    teacher_name = f"cifar_teacher_model_temp{temperature}_ep{max_epochs}_lr{lr}_batch{batch_size}"
+
     LOGGER.info("\nTraining Teacher Model")
 
-    teacher_losses = train_teacher(
+    train_teacher(
         teacher_model,
         trainloader,
         epochs=max_epochs,
         criterion=criterion,
         optimizer=optimizer,
         device=device,
+        save_path=save_path,
+        model_name=teacher_name,
     )
+
+    # Set to evaluation mode
+    teacher_model.eval()
+    # Set model temperature to 1 after training
+    teacher_model.temperature = 1.0
+    # Apply softmax probabilities during inference
+    teacher_model.raw_logits = False
 
     # Wrap in ART PyTorchClassifier
     art_model_t = PyTorchClassifier(
@@ -168,10 +181,19 @@ def main(
         art_model_t.model, cifar_data, cifar_targets, device=device
     )
     LOGGER.info(f"Test Accuracy: {teacher_accuracy:.2f}%")
+    
+    # Criterion needs logits
+    teacher_model.raw_logits = True
 
     LOGGER.info(
         f"Mean Gradient Amplitude: {calculate_mean_gradient_amplitude(art_model_t.model, cifar_data, cifar_targets, criterion, device=device)}"
     )
+    LOGGER.info(
+        f"Binned Mean Gradient Amplitude (as implemented in Paparnot et. al 2016): {calculate_binned_gradient_amplitude(art_model_t.model, cifar_data, cifar_targets, criterion, device=device)}"
+    )
+
+    # Apply softmax probabilities during inference
+    teacher_model.raw_logits = False
 
     # Ensure teacher model is not on mps to create the attacks
     if device == "mps":
@@ -195,6 +217,7 @@ def main(
 
     # Evaluate the teacher model on adversarial examples
     LOGGER.info("Evaluating Teacher Model on Teacher-based Adversarial Examples:")
+    
     LOGGER.info(
         evaluate_adversarial_metrics(
             art_model_t.model,
@@ -212,18 +235,23 @@ def main(
         teacher_model,
         student_model,
         trainloader,
-        criterion=criterion,
+        criterion=criterion_dist,
         epochs=max_epochs,
         lr=lr,
         temperature=temperature,
         device=device,
     )
 
+    # Set to evaluation mode
+    student_model.eval()   
+    # Set model temperature to 1 after training
+    student_model.temperature = 1.0    
+
     # Wrap in ART PyTorchClassifier
     art_model_s = PyTorchClassifier(
         model=student_model,
         clip_values=(-1, 1),  # Min and Max pixel values (normalize if needed)
-        loss=criterion,
+        loss=criterion_dist,
         optimizer=optimizer,
         input_shape=(n_channels, w, h),
         nb_classes=10,
@@ -235,13 +263,15 @@ def main(
     )
     LOGGER.info(f"Test Accuracy: {student_accuracy:.2f}%")
 
+    # Criterion needs logits
+    student_model.raw_logits = True 
+
     LOGGER.info(
         f"Mean Gradient Amplitude: {calculate_mean_gradient_amplitude(art_model_s.model, cifar_data, cifar_targets, criterion, device=device)}"
     )
-
-    # Ensure student model is not on mps to create the attacks
-    if device == "mps":
-        student_model.to("cpu")
+    LOGGER.info(
+        f"Binned Mean Gradient Amplitude (as implemented in Paparnot et. al 2016): {calculate_binned_gradient_amplitude(art_model_s.model, cifar_data, cifar_targets, criterion, device=device)}"
+    )
 
     # Adversarial attacks
     # Generate Adversarial Examples from the Student Model
@@ -259,6 +289,9 @@ def main(
 
     # Transfer model back to device
     student_model.to(device)
+
+    # Apply softmax probabilities during inference
+    student_model.raw_logits = False
 
     # Evaluate the teacher model on adversarial examples
     LOGGER.info("Evaluating Student Model on Student-based Adversarial Examples:")

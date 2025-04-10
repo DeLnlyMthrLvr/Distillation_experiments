@@ -5,7 +5,7 @@ This script trains a teacher model on the MNIST dataset, generates adversarial e
 and evaluates the models' performance on both clean and adversarial data.
 
 To run the script you can use the following command, adjusting argumments as needed:
-ipython scripts/train_mnist_jacobian_attack.py -- --lr 0.001 --batch_size 128 --max_epochs 10 --temperature 30 --num_samples 20 --device 'mps'
+ipython scripts/train_mnist_jacobian_attack.py -- --lr 0.001 --batch_size 128 --max_epochs 2 --temperature 30 --num_samples 2 --device 'mps'
 
 
 """
@@ -39,7 +39,6 @@ from evaluation.metrics import (
 )
 from utils.experiment_saver import save_experiment_results
 from utils.jsma_generate import generate_adversarial_samples
-from processing.distillation import soft_cross_entropy
 
 
 from art.attacks.evasion.saliency_map import SaliencyMapMethod
@@ -127,7 +126,6 @@ def main(
     # Specify the loss function and optimizer for teacher model
     criterion = nn.CrossEntropyLoss()
     criterion_dist = nn.KLDivLoss(reduction="batchmean", log_target=True)
-    #criterion_dist = lambda student_logits, soft_labels: soft_cross_entropy(student_logits, soft_labels, temperature) * temperature * temperature
 
     optimizer = optim.AdamW(teacher_model.parameters(), lr=lr)
 
@@ -169,7 +167,7 @@ def main(
             teacher_model,
             trainloader,
             criterion=criterion,
-            optimizer=torch.optim.Adam(teacher_model.parameters(), lr=lr),
+            optimizer=optimizer,
             device=device,
             epochs=max_epochs,
             save_path=save_path,
@@ -223,12 +221,11 @@ def main(
     expanded_data, expanded_labels, x_adv, y_adv = generate_adversarial_samples(mnist_data_subset, mnist_targets_subset, art_model_t, theta=0.4, gamma=0.5, batch_size=32, device=device)
 
     visualize_adversarial(expanded_data, x_adv, expanded_labels, rgb=False)
-    x_adv = x_adv.reshape(-1, n_channels, w, h)
+    
     show_difference(
         expanded_data[0][0], x_adv[0][0], title="Jacobian-Saliency Map Method"
     )
-    # Flatten
-    x_adv = x_adv.reshape(-1, n_channels, w, h)
+
 
     # Evaluate the teacher model on adversarial examples
     LOGGER.info("Evaluating Teacher Model on Teacher-based Adversarial Examples:")
