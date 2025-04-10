@@ -156,7 +156,7 @@ def main(
     # Wrap in ART PyTorchClassifier
     art_model_t = PyTorchClassifier(
         model=teacher_model,
-        clip_values=(0, 1),  # Min and Max pixel values (normalize if needed)
+        clip_values=(-1, 1),  # Min and Max pixel values (normalize if needed)
         loss=criterion,
         optimizer=optimizer,
         input_shape=(n_channels, w, h),
@@ -222,10 +222,10 @@ def main(
     # Wrap in ART PyTorchClassifier
     art_model_s = PyTorchClassifier(
         model=student_model,
-        clip_values=(0, 1),  # Min and Max pixel values (normalize if needed)
+        clip_values=(-1, 1),  # Min and Max pixel values (normalize if needed)
         loss=criterion,
         optimizer=optimizer,
-        input_shape=(1, 28, 28),
+        input_shape=(n_channels, w, h),
         nb_classes=10,
     )
 
@@ -365,7 +365,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--save_path",
         type=str,
-        default="experiments/cifar_results.csv",
+        default="experiments/cifar_jacobian_results.csv",
         help="Path to save the experiment results.",
     )
     parser.add_argument(

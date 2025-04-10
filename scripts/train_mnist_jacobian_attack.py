@@ -266,9 +266,9 @@ def main(
     # Generate Adversarial Examples from the Student Model
     LOGGER.info("\nGenerating Adversarial Examples from Student Model:")
 
-    LOGGER.info("Generating FSGM Adversarial Examples")
+    LOGGER.info("Generating Jacobian-Saliency Adversarial Examples")
 
-    expanded_data, expanded_labels, x_adv_s, y_adv_s = generate_adversarial_samples(mnist_data_subset, mnist_targets_subset, art_model_t, theta=0.8, gamma=0.7, batch_size=32, device=device)
+    expanded_data, expanded_labels, x_adv_s, y_adv_s = generate_adversarial_samples(mnist_data_subset, mnist_targets_subset, art_model_s, theta=0.8, gamma=0.7, batch_size=32, device=device)
 
 
     visualize_adversarial(expanded_data, x_adv_s, expanded_labels, rgb=False)
