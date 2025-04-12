@@ -35,8 +35,7 @@ For training and evaluation. Located in `scripts/`:
 |-------------------------------------|-------------|
 | `train_cifar_model.py`             | Trains a CIFAR-10 model if needed, and runs FGSM, DeepFool, and One-Pixel attacks |
 | `train_mnist_model.py`             | Same as above, for MNIST |
-| `train_cifar_jacobian_attack.py`   | Trains a CIFAR-10 teacher if needed, and runs JSMA |
-| `train_mnist_jacobian_attack.py`   | Same as above, for MNIST |
+| `train_cifar_all.py`   | Trains a CIFAR-10 teacher if needed, and runs JSMA FGSM, DeepFool, and One-Pixel attacks |
 
 ---
 
@@ -48,7 +47,7 @@ e.g. ipython scripts/train_cifar_jacobian_attack.py -- --lr 0.001 --batch_size 2
 
 | Argument       | Default                          | Description |
 |----------------|----------------------------------|-------------|
-| `--lr`         | `0.001`                          | Learning rate |
+| `--lr`         | `0.01`                          | Learning rate |
 | `--batch_size` | `128`                            | Batch size |
 | `--n_channels` | `3`                              | Number of channels |
 | `--w`          | `32`                             | Image width |
@@ -57,7 +56,8 @@ e.g. ipython scripts/train_cifar_jacobian_attack.py -- --lr 0.001 --batch_size 2
 | `--save_path`  | `"experiments/cifar_jacobian_exper"` | Where to store experiment results |
 | `--temperature`| `20`                             | Softmax temperature |
 | `--num_samples`| `100`                            | Number of adversarial samples |
-| `--device`     | `"cpu"`                          | Device to use |
+| `--device`     | `"cuda"/"cpu"`                          | Device to use |
+| `--headless`   | `True`|Headless (No gui)|
 | `--save_fig`   | `False`                          | Save figures or not |
 
 ### MNIST
