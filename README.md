@@ -77,6 +77,39 @@ e.g. ipython scripts/train_cifar_jacobian_attack.py -- --lr 0.001 --batch_size 2
 
 ---
 
+## ⚙️ Environment Setup
+
+Below are instructions in order to setup all pre-requisites before running the code.
+
+### 🧰 1. Create the environment and install dependencies
+
+Run `make setup` in the root directory. This will:
+- Create a virtual environment in a folder named `env`
+- Upgrade `pip`, `setuptools`, and `wheel`
+- Install dependencies listed in `requirements.txt`
+- Install `matplotlib` using a prebuilt binary to avoid OS-specific build errors
+- Install `ipython` for running Python scripts via terminal
+
+### 🧠 2. Activate the virtual environment
+
+After setup, activate the environment:
+- On macOS or Linux, run `source env/bin/activate`
+- On Windows (Command Prompt), run `env\Scripts\activate.bat`
+- On Windows (PowerShell), run `env\Scripts\Activate.ps1`
+
+### 🧠 3. Install PyTorch (CPU-only, manual step)
+
+To avoid compatibility issues with CUDA and GPU drivers, install the CPU-only version of PyTorch manually. Run `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu` inside the activated environment.
+
+### ✅ 4. Run a quick test
+
+To verify everything works correctly, run `make test`. This executes a minimal training script (`scripts/train_mnist_jacobian_attack.py`) with the arguments `--max_epochs 2` and `--num_samples 2`. It performs a short training pass and generates adversarial examples to ensure setup is working properly.
+
+### 🧹 5. Clean the environment
+
+To delete the environment and start fresh, run `make clean`. This removes the `env` folder and all installed dependencies.
+
+
 ## 📖 Paper Reference
 
 > **Distillation as a Defense to Adversarial Perturbations against Deep Neural Networks**  
