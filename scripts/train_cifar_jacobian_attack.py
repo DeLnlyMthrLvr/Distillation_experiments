@@ -62,6 +62,7 @@ def main(
     num_samples: int,
     device: str,
     save_path: str,
+    headless: bool,
 ):
     """
     Main function to train a teacher and a distilled studemt model on cifar, generate adversarial examples, and evaluate the models.
@@ -77,6 +78,7 @@ def main(
         num_samples (int): Number of samples to use for generating adversarial examples.
         device (str): Device to run the training and evaluation on.
         save_path (str): Path to save the experiment results.
+        headless (bool): If True, run in headless mode (no GUI).
     """
     ssl._create_default_https_context = ssl._create_stdlib_context
 
@@ -208,10 +210,47 @@ def main(
 
     expanded_data, expanded_labels, x_adv, y_adv = generate_adversarial_samples(cifar_data_subset, cifar_targets_subset, art_model_t, theta=0.4, gamma=0.5, batch_size=32, device=device)
 
-    visualize_adversarial(expanded_data, x_adv, expanded_labels)
-    show_difference(
-        expanded_data[0][0], x_adv[0][0], title="Jacobian-Saliency Map Method"
+    if not headless:
+        visualize_adversarial(expanded_data, x_adv, expanded_labels)
+        show_difference(
+            expanded_data[0][0], x_adv[0][0], title="Jacobian-Saliency Map Method"
+        )
+        
+    
+    LOGGER.info("Generating FSGM Adversarial Examples")
+    attack = FastGradientMethod(
+        estimator=art_model_t,
+        eps=0.4,
+        eps_step=0.1,
+        batch_size=32,
+        minimal=True,
+        targeted=False,
+        summary_writer=True,
     )
+    x_adv_fgm = attack.generate(x=cifar_data_subset, y=cifar_targets_subset)
+    if not headless:
+        visualize_adversarial(cifar_data_subset, x_adv_fgm, cifar_targets_subset)
+        show_difference(
+            cifar_data_subset[0][0], x_adv_fgm[0][0], title="Fast-Gradient Method"
+        )
+        
+
+    LOGGER.info("Generating DeepFool Adversarial Examples")
+    attack = DeepFool(classifier=art_model_t, epsilon=0.001, max_iter=50, batch_size=32)
+    x_adv_deepfool = attack.generate(x=cifar_data_subset, y=cifar_targets_subset)
+    if not headless:
+        visualize_adversarial(cifar_data_subset, x_adv_deepfool, cifar_targets_subset)
+        show_difference(
+            cifar_data_subset[0][0], x_adv_deepfool[0][0], title="Deepfool Method"
+        )
+
+    LOGGER.info("Generating One Pixel Adversarial Examples")
+    attack = PixelAttack(classifier=art_model_t, th=5, es=1, max_iter=50)
+    x_adv_pixel = attack.generate(x=cifar_data_subset, y=cifar_targets_subset)
+    if not headless:
+        visualize_adversarial(cifar_data_subset, x_adv_pixel, cifar_targets_subset)
+        show_difference(cifar_data_subset[0][0], x_adv_pixel[0][0], title="Pixel Method")
+
     
     # Transfer model back to device
     teacher_model.to(device)
@@ -228,6 +267,36 @@ def main(
             device=device,
         )
     )
+    LOGGER.info(
+        evaluate_adversarial_metrics(
+            art_model_t.model,
+            cifar_data_subset,
+            cifar_targets_subset,
+            x_adv_fgm,
+            device=device,
+        )
+    )
+    # DeepFool
+    LOGGER.info(
+        evaluate_adversarial_metrics(
+            art_model_t.model,
+            cifar_data_subset,
+            cifar_targets_subset,
+            x_adv_deepfool,
+            device=device,
+        )
+    )
+    # One Pixel Attack
+    LOGGER.info(
+        evaluate_adversarial_metrics(
+            art_model_t.model,
+            cifar_data_subset,
+            cifar_targets_subset,
+            x_adv_pixel,
+            device=device,
+        )
+    )
+
     ## Student Model
 
     LOGGER.info("\nTraining Student Model using Defensive Distillation")
@@ -238,7 +307,7 @@ def main(
         trainloader,
         criterion=criterion_dist,
         epochs=max_epochs,
-        lr=lr,
+        lr=0.0001,
         temperature=temperature,
         device=device,
     )
@@ -260,7 +329,7 @@ def main(
 
     # Evaluate model on entire testset
     student_accuracy = evaluate_model(
-        art_model_s.model, cifar_data, cifar_targets, device=device
+        art_model_s.model, cifar_data/255, cifar_targets, device=device
     )
     LOGGER.info(f"Test Accuracy: {student_accuracy:.2f}%")
 
@@ -283,10 +352,44 @@ def main(
     expanded_data, expanded_labels, x_adv_s, y_adv = generate_adversarial_samples(cifar_data_subset, cifar_targets_subset, art_model_s, theta=0.4, gamma=0.5, batch_size=32, device=device)
 
 
-    visualize_adversarial(expanded_data, x_adv_s, expanded_labels)
-    show_difference(
-        expanded_data[0][0], x_adv_s[0][0], title="Jacobian-Saliency Method"
+    if not headless:
+        visualize_adversarial(expanded_data, x_adv_s, expanded_labels)
+        show_difference(
+            expanded_data[0][0], x_adv_s[0][0], title="Jacobian-Saliency Method"
+        )
+
+    LOGGER.info("Generating FSGM Adversarial Examples")
+    attack = FastGradientMethod(
+        estimator=art_model_s,
+        eps=0.4,
+        eps_step=0.1,
+        batch_size=32,
+        minimal=True,
+        targeted=False,
     )
+    x_adv_fgm_s = attack.generate(x=cifar_data_subset, y=cifar_targets_subset)
+    if not headless:
+        visualize_adversarial(cifar_data_subset, x_adv_fgm_s, cifar_targets_subset)
+        show_difference(
+            cifar_data_subset[0][0], x_adv_fgm_s[0][0], title="Fast-Gradient Method"
+        )
+        
+
+    LOGGER.info("Generating DeepFool Adversarial Examples")
+    attack = DeepFool(classifier=art_model_s, epsilon=0.001, max_iter=50, batch_size=32)
+    x_adv_deepfool_s = attack.generate(x=cifar_data_subset, y=cifar_targets_subset)
+    if not headless:
+        visualize_adversarial(cifar_data_subset, x_adv_deepfool_s, cifar_targets_subset)
+        show_difference(
+            cifar_data_subset[0][0], x_adv_deepfool_s[0][0], title="Deepfool Method"
+        )
+
+    LOGGER.info("Generating One Pixel Adversarial Examples")
+    attack = PixelAttack(classifier=art_model_s, th=5, es=1, max_iter=50)
+    x_adv_pixel_s = attack.generate(x=cifar_data_subset, y=cifar_targets_subset)
+    if not headless:
+        visualize_adversarial(cifar_data_subset, x_adv_pixel_s, cifar_targets_subset)
+        show_difference(cifar_data_subset[0][0], x_adv_pixel_s[0][0], title="Pixel Method")
 
     # Transfer model back to device
     student_model.to(device)
@@ -345,9 +448,15 @@ def main(
             "Accuracy (T)",
             "Mean Gradient Amplitude (T)",
             "Metrics (JSMA)",
+            "Metrics (FSGM)",
+            "Metrics (DeepFool)",
+            "Metrics (Pixel)",
             "Accuracy (S)",
             "Mean Gradient Amplitude (S)",
             "Metrics (JSMA)",
+            "Metrics (FSGM)",
+            "Metrics (DeepFool)",
+            "Metrics (Pixel)",
         ],
         [
             max_epochs,
@@ -366,6 +475,27 @@ def main(
                 x_adv,
                 device=device,
             ),
+            evaluate_adversarial_metrics(
+                art_model_t.model,
+                cifar_data_subset,
+                cifar_targets_subset,
+                x_adv_fgm,
+                device=device,
+            ),
+            evaluate_adversarial_metrics(
+                art_model_t.model,
+                cifar_data_subset,
+                cifar_targets_subset,
+                x_adv_deepfool,
+                device=device,
+            ),
+            evaluate_adversarial_metrics(
+                art_model_t.model,
+                cifar_data_subset,
+                cifar_targets_subset,
+                x_adv_pixel,
+                device=device,
+            ),
             student_accuracy,
             calculate_mean_gradient_amplitude(
                 art_model_s.model, cifar_data, cifar_targets, criterion, device=device
@@ -375,6 +505,27 @@ def main(
                 expanded_data,
                 expanded_labels,
                 x_adv_s,
+                device=device,
+            ),
+            evaluate_adversarial_metrics(
+                art_model_s.model,
+                cifar_data_subset,
+                cifar_targets_subset,
+                x_adv_fgm_s,
+                device=device,
+            ),
+            evaluate_adversarial_metrics(
+                art_model_s.model,
+                cifar_data_subset,
+                cifar_targets_subset,
+                x_adv_deepfool_s,
+                device=device,
+            ),
+            evaluate_adversarial_metrics(
+                art_model_s.model,
+                cifar_data_subset,
+                cifar_targets_subset,
+                x_adv_pixel_s,
                 device=device,
             ),
         ],
@@ -414,8 +565,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--device",
         type=str,
-        default="cpu",
+        default="cuda" if torch.cuda.is_available() else "cpu",
         help="Device to run the training and evaluation on.",
+    )
+    parser.add_argument(
+        "--headless",
+        type=bool,
+        default=False,
+        help="Whether to run in headless mode (no GUI).",
     )
     args = parser.parse_args()
     # Call the main function with parsed arguments
@@ -430,4 +587,5 @@ if __name__ == "__main__":
         num_samples=args.num_samples,
         device=args.device,
         save_path=args.save_path,
+        headless=args.headless,
     )

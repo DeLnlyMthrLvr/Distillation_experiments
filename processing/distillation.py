@@ -199,7 +199,7 @@ def train_student(
             # Get teacher soft labels (detach to prevent gradient flow)
             with torch.no_grad():
                 teacher_logits = teacher_model(images)
-                soft_labels = torch.softmax(teacher_logits / temperature, dim=1)
+                soft_labels = torch.softmax(teacher_logits, dim=1)
 
             # Get student predictions
             student_logits = student_model(images)
