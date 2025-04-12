@@ -5,8 +5,8 @@ This script trains a teacher model on the Cifar-10 dataset, generates adversaria
 and evaluates the models' performance on both clean and adversarial data.
 
 To run the script you can use the following command, adjusting argumments as needed:
-ipython scripts/train_cifar_jacobian_attack.py -- --lr 0.001 --batch_size 128 --max_epochs 2 \
---temperature 2 --num_samples 100 --device 'mps' --save_fig True --headless True
+ipython scripts/train_cifar_all.py -- --lr 0.01 --batch_size 128 --max_epochs 50 \
+--temperature 2 --num_samples 100 --device 'cuda' --save_fig False --headless False
 
 """
 import torch
@@ -176,8 +176,11 @@ def main(
         # Train the teacher model
         train_teacher(
         teacher_model,
+        trainloader,
+        epochs=max_epochs,
+        criterion=criterion,
+        optimizer=optimizer,
         device=device,
-        load_path=save_path,
         load_path=save_path,
         model_name=teacher_name,
     )
