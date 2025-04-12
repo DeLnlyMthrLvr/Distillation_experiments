@@ -5,7 +5,8 @@ This script trains a teacher model on the Cifar-10 dataset, generates adversaria
 and evaluates the models' performance on both clean and adversarial data.
 
 To run the script you can use the following command, adjusting argumments as needed:
-ipython scripts/train_cifar_jacobian_attack.py -- --lr 0.001 --batch_size 128 --max_epochs 50 --temperature 2 --num_samples 100 --device 'mps'
+ipython scripts/train_cifar_jacobian_attack.py -- --lr 0.001 --batch_size 128 --max_epochs 2 \
+--temperature 2 --num_samples 100 --device 'mps' --save_fig True
 
 """
 import torch
@@ -62,6 +63,7 @@ def main(
     num_samples: int,
     device: str,
     save_path: str,
+    save_fig: bool,
 ):
     """
     Main function to train a teacher and a distilled studemt model on cifar, generate adversarial examples, and evaluate the models.
@@ -77,6 +79,7 @@ def main(
         num_samples (int): Number of samples to use for generating adversarial examples.
         device (str): Device to run the training and evaluation on.
         save_path (str): Path to save the experiment results.
+        save_fig (bool): Whether to save figures.
     """
     ssl._create_default_https_context = ssl._create_stdlib_context
 
@@ -226,9 +229,11 @@ def main(
 
     expanded_data, expanded_labels, x_adv, y_adv = generate_adversarial_samples(cifar_data_subset, cifar_targets_subset, art_model_t, theta=0.4, gamma=0.5, batch_size=32, device=device)
 
-    visualize_adversarial(expanded_data, x_adv, expanded_labels)
+    visualize_adversarial(expanded_data, x_adv, expanded_labels, save_fig=save_fig,
+                          save_path='jsma_t.png')
     show_difference(
-        expanded_data[0][0], x_adv[0][0], title="Jacobian-Saliency Map Method"
+        expanded_data[0][0], x_adv[0][0], title="Jacobian-Saliency Map Method", save_fig=save_fig,
+        save_path='jsma_diff_t.png'
     )
     
     # Transfer model back to device
@@ -301,9 +306,10 @@ def main(
     expanded_data, expanded_labels, x_adv_s, y_adv = generate_adversarial_samples(cifar_data_subset, cifar_targets_subset, art_model_s, theta=0.4, gamma=0.5, batch_size=32, device=device)
 
 
-    visualize_adversarial(expanded_data, x_adv_s, expanded_labels)
+    visualize_adversarial(expanded_data, x_adv_s, expanded_labels, save_fig=save_fig, save_path="jsma_s.png")
     show_difference(
-        expanded_data[0][0], x_adv_s[0][0], title="Jacobian-Saliency Method"
+        expanded_data[0][0], x_adv_s[0][0], title="Jacobian-Saliency Method", save_fig=save_fig, 
+        save_path="jsma_diff_s.png"
     )
 
     # Transfer model back to device
@@ -435,7 +441,14 @@ if __name__ == "__main__":
         default="cpu",
         help="Device to run the training and evaluation on.",
     )
+    parser.add_argument(
+        "--save_fig",
+        type=bool,
+        default=False,
+        help="Whether to save figures.",
+    )
     args = parser.parse_args()
+
     # Call the main function with parsed arguments
     main(
         lr=args.lr,
@@ -448,4 +461,5 @@ if __name__ == "__main__":
         num_samples=args.num_samples,
         device=args.device,
         save_path=args.save_path,
+        save_fig=args.save_fig
     )

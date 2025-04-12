@@ -4,12 +4,14 @@ import matplotlib.pyplot as plt
 import random
 
 
-def show_difference(original, adversarial, title="Method"):
+def show_difference(original, adversarial, title="Method", save_fig=False, save_path='figure.png'):
     """
     Displays the original and adversarial images side by side, along with their difference.
     :param original: Original image (NumPy array or PyTorch Tensor).
     :param adversarial: Adversarial image (NumPy array or PyTorch Tensor).
     :param title: Title for the adversarial image.
+    :param save_fig: Whether to save the figure with a transparent bg.
+    :param save_path: The path to save figure to in case save_fig is True.
     """
     diff = np.abs(original - adversarial)
     plt.figure(figsize=(10, 4))
@@ -26,10 +28,15 @@ def show_difference(original, adversarial, title="Method"):
     plt.imshow(diff, cmap="hot")
     plt.title("Difference (Perturbation)")
 
+    # Whether to save the figure
+    if save_fig:
+        plt.savefig(save_path, transparent=True)
+
     plt.show()
 
 
-def visualize_adversarial(data, adversarial_data, labels, rgb=True, num_samples=5):
+def visualize_adversarial(data, adversarial_data, labels, rgb=True, num_samples=5, 
+                          save_fig=False, save_path='figure.png'):
     """
     Displays a comparison of original and adversarial images for a subset of samples.
 
@@ -38,6 +45,8 @@ def visualize_adversarial(data, adversarial_data, labels, rgb=True, num_samples=
     :param labels: True labels for the images (can be one-hot or class indices).
     :param rgb: If True, assumes the images are RGB. If False, assumes grayscale.
     :param num_samples: Number of samples to display.
+    :param save_fig: Whether to save the figure with a transparent bg.
+    :param save_path: The path to save figure to in case save_fig is True.
     """
 
     if isinstance(data, torch.Tensor):  # Convert tensors to numpy
@@ -73,10 +82,15 @@ def visualize_adversarial(data, adversarial_data, labels, rgb=True, num_samples=
         axes[i, 1].axis("off")
 
     plt.tight_layout()
+
+    # Whether to save the figure
+    if save_fig:
+        plt.savefig(save_path, transparent=True)
+        
     plt.show()
 
 
-def visualize_from_dataloader(model, dataloader, temp, rgb=True, device="cpu"):
+def visualize_from_dataloader(model, dataloader, temp, rgb=True, device="cpu", save_fig=True, save_path='figure.png'):
     """
     Selects a random MNIST image from the dataset, gets its label, and computes its soft labels.
 
@@ -85,6 +99,8 @@ def visualize_from_dataloader(model, dataloader, temp, rgb=True, device="cpu"):
     :param temp: Temperature parameter for soft labels.
     :param rgb: If True, assumes the images are RGB. If False, assumes grayscale.
     :param device: Device to run the model on.
+    :param save_fig: Whether to save the figure with a transparent bg.
+    :param save_path: The path to save figure to in case save_fig is True.
     """
     model.eval()
 
@@ -110,4 +126,9 @@ def visualize_from_dataloader(model, dataloader, temp, rgb=True, device="cpu"):
         plt.imshow(image.squeeze().cpu(), cmap="gray")  # Use grayscale colormap for MNIST
     plt.title(f"True Label: {label}\nSoft Labels: {soft_labels.round(2)}")
     plt.axis("off")
+
+    # Whether to save the figure
+    if save_fig:
+        plt.savefig(save_path, transparent=True)
+
     plt.show()
