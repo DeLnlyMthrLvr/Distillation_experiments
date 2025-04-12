@@ -11,3 +11,6 @@ experiments_jsma/
 data/
 # git stuff
 .DS_Store
+# images
+*.png
+*.jpg

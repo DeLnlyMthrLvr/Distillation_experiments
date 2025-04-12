@@ -5,7 +5,7 @@ This script trains a teacher model on the MNIST dataset, generates adversarial e
 and evaluates the models' performance on both clean and adversarial data.
 
 To run the script you can use the following command, adjusting argumments as needed:
-ipython scripts/train_mnist_jacobian_attack.py -- --lr 0.001 --batch_size 128 --max_epochs 2 --temperature 30 --num_samples 2 --device 'mps'
+ipython scripts/train_mnist_jacobian_attack.py -- --lr 0.001 --batch_size 256 --max_epochs 23 --temperature 20 --num_samples 100 --device 'mps'
 
 
 """
@@ -167,7 +167,7 @@ def main(
             teacher_model,
             trainloader,
             criterion=criterion,
-            optimizer=optimizer,
+            optimizer=torch.optim.Adam(teacher_model.parameters(), lr=lr),
             device=device,
             epochs=max_epochs,
             save_path=save_path,
@@ -179,7 +179,7 @@ def main(
     # Set model temperature to 1 after training
     teacher_model.temperature = 1.0
     # Apply softmax probabilities during inference
-    teacher_model.raw_logits = False
+    teacher_model.raw_logits = True
 
     # Wrap in ART PyTorchClassifier
     art_model_t = PyTorchClassifier(
@@ -218,7 +218,7 @@ def main(
 
     LOGGER.info("Generating Jacobian-Saliency Adversarial Examples")
 
-    expanded_data, expanded_labels, x_adv, y_adv = generate_adversarial_samples(mnist_data_subset, mnist_targets_subset, art_model_t, theta=0.4, gamma=0.5, batch_size=32, device=device)
+    expanded_data, expanded_labels, x_adv, y_adv = generate_adversarial_samples(mnist_data_subset, mnist_targets_subset, art_model_t, theta=1.0, gamma=0.14, batch_size=32, device=device)
 
     visualize_adversarial(expanded_data, x_adv, expanded_labels, rgb=False)
     
@@ -275,7 +275,7 @@ def main(
     student_accuracy = evaluate_model(
         art_model_s.model, mnist_data, mnist_targets, device=device
     )
-    LOGGER.info(f"Test Accuracy: {student_accuracy:.2f}%")
+    LOGGER.info(f"Test Accuracy: {student_accuracy:.2f}%") 
 
     # Criterion needs logits
     student_model.raw_logits = True 
@@ -294,7 +294,7 @@ def main(
 
     LOGGER.info("Generating Jacobian-Saliency Adversarial Examples")
 
-    expanded_data, expanded_labels, x_adv_s, y_adv_s = generate_adversarial_samples(mnist_data_subset, mnist_targets_subset, art_model_s, theta=0.4, gamma=0.5, batch_size=32, device=device)
+    expanded_data, expanded_labels, x_adv_s, y_adv_s = generate_adversarial_samples(mnist_data_subset, mnist_targets_subset, art_model_s, theta=1.0, gamma=0.14, batch_size=32, device=device)
 
 
     visualize_adversarial(expanded_data, x_adv_s, expanded_labels, rgb=False)

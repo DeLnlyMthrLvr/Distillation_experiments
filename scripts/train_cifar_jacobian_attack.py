@@ -5,7 +5,8 @@ This script trains a teacher model on the Cifar-10 dataset, generates adversaria
 and evaluates the models' performance on both clean and adversarial data.
 
 To run the script you can use the following command, adjusting argumments as needed:
-ipython scripts/train_cifar_jacobian_attack.py -- --lr 0.001 --batch_size 256 --max_epochs 2 --temperature 20 --num_samples 2 --device 'mps'
+ipython scripts/train_cifar_jacobian_attack.py -- --lr 0.001 --batch_size 128 --max_epochs 2 \
+--temperature 2 --num_samples 100 --device 'mps' --save_fig True --headless True
 
 """
 import torch
@@ -30,7 +31,8 @@ from evaluation.metrics import evaluate_adversarial_metrics
 from evaluation.metrics import evaluate_model
 from processing.visualize import show_difference
 from processing.visualize import visualize_adversarial
-from processing.distillation import train_student, train_teacher
+from processing.distillation import train_student, train_teacher, load_model
+
 from evaluation.metrics import calculate_mean_gradient_amplitude, calculate_binned_gradient_amplitude
 from utils.experiment_saver import save_experiment_results
 
@@ -63,6 +65,7 @@ def main(
     device: str,
     save_path: str,
     headless: bool,
+    save_fig: bool,
 ):
     """
     Main function to train a teacher and a distilled studemt model on cifar, generate adversarial examples, and evaluate the models.
@@ -120,8 +123,23 @@ def main(
         testset, batch_size=batch_size, shuffle=False
     )
 
-    # Define a simple CNN model for CIFAR-10 classification
-    teacher_model = Cifar10Net(input_size=w, temperature=temperature, raw_logits=True).to(device)
+    
+    teacher_name = f"cifar_teacher_model_temp{temperature}_ep{max_epochs}_lr{lr}_batch{batch_size}"
+
+    # Load the model
+    teacher_model = load_model(
+        Cifar10Net(input_size=w, temperature=temperature, raw_logits=True).to(device),
+        device=device,
+        load_path=save_path,
+        model_name=teacher_name,
+    )
+
+    if teacher_model is None:
+        # Define a simple CNN model for CIFAR-10 classification
+        teacher_model = Cifar10Net(input_size=w, temperature=temperature, raw_logits=True).to(device)
+        training = True
+    else:
+        training = False
     student_model = Cifar10Net(input_size=w, temperature=temperature, raw_logits=False).to(device)
 
     # Specify the loss function and optimizer for teacher model
@@ -147,11 +165,16 @@ def main(
 
     ## Teacher Model
 
-    teacher_name = f"cifar_teacher_model_temp{temperature}_ep{max_epochs}_lr{lr}_batch{batch_size}"
 
-    LOGGER.info("\nTraining Teacher Model")
 
-    train_teacher(
+
+    
+    # If the model is not loaded (returns None), train and save it
+    if training:
+        LOGGER.info("\nTraining Teacher Model")
+
+        # Train the teacher model
+        train_teacher(
         teacher_model,
         trainloader,
         epochs=max_epochs,
@@ -161,6 +184,7 @@ def main(
         save_path=save_path,
         model_name=teacher_name,
     )
+
 
     # Set to evaluation mode
     teacher_model.eval()
@@ -211,9 +235,11 @@ def main(
     expanded_data, expanded_labels, x_adv, y_adv = generate_adversarial_samples(cifar_data_subset, cifar_targets_subset, art_model_t, theta=0.4, gamma=0.5, batch_size=32, device=device)
 
     if not headless:
-        visualize_adversarial(expanded_data, x_adv, expanded_labels)
+        visualize_adversarial(expanded_data, x_adv, expanded_labels, save_fig=save_fig,
+                          save_path='jsma_t.png')
         show_difference(
-            expanded_data[0][0], x_adv[0][0], title="Jacobian-Saliency Map Method"
+            expanded_data[0][0], x_adv[0][0], title="Jacobian-Saliency Map Method", save_fig=save_fig,
+            save_path='jsma_diff_t.png'
         )
         
     
@@ -353,9 +379,10 @@ def main(
 
 
     if not headless:
-        visualize_adversarial(expanded_data, x_adv_s, expanded_labels)
+        visualize_adversarial(expanded_data, x_adv_s, expanded_labels, save_fig=save_fig, save_path="jsma_s.png")
         show_difference(
-            expanded_data[0][0], x_adv_s[0][0], title="Jacobian-Saliency Method"
+            expanded_data[0][0], x_adv_s[0][0], title="Jacobian-Saliency Method", save_fig=save_fig, 
+            save_path="jsma_diff_s.png"
         )
 
     LOGGER.info("Generating FSGM Adversarial Examples")
@@ -550,7 +577,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--save_path",
         type=str,
-        default="experiments/cifar_jacobian_exper",
+        default="experiments/cifar_final",
         help="Path to save the experiment results.",
     )
     parser.add_argument(
@@ -574,7 +601,15 @@ if __name__ == "__main__":
         default=False,
         help="Whether to run in headless mode (no GUI).",
     )
+    parser.add_argument(
+        "--save_fig",
+        type=bool,
+        default=False,
+        help="Whether to save figures.",
+    )
     args = parser.parse_args()
+
+
     # Call the main function with parsed arguments
     main(
         lr=args.lr,
@@ -588,4 +623,5 @@ if __name__ == "__main__":
         device=args.device,
         save_path=args.save_path,
         headless=args.headless,
+        save_fig=args.save_fig
     )

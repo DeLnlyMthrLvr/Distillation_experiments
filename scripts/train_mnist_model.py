@@ -5,7 +5,7 @@ This script trains a teacher model on the MNIST dataset, generates adversarial e
 and evaluates the models' performance on both clean and adversarial data.
 
 To run the script you can use the following command, adjusting argumments as needed:
-ipython scripts/train_mnist_model.py -- --lr 0.001 --batch_size 128 --max_epochs 50 --temperature 30 --num_samples 100 --device 'mps'
+ipython scripts/train_mnist_model.py -- --lr 0.001 --batch_size 256 --max_epochs 50 --temperature 10 --num_samples 100 --device 'mps'
 
 
 """
@@ -320,6 +320,7 @@ def main(
         art_model_s.model, mnist_data, mnist_targets, device=device
     )
     LOGGER.info(f"Test Accuracy: {student_accuracy:.2f}%")
+
 
     # Criterion needs logits
     student_model.raw_logits = True 

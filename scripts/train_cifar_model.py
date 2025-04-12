@@ -5,7 +5,8 @@ This script trains a teacher model on the Cifar-10 dataset, generates adversaria
 and evaluates the models' performance on both clean and adversarial data.
 
 To run the script you can use the following command, adjusting argumments as needed:
-ipython scripts/train_cifar_model.py -- --lr 0.001 --batch_size 256 --max_epochs 2 --temperature 20 --num_samples 2 --device 'mps'
+ipython scripts/train_cifar_model.py -- --lr 0.001 --batch_size 128 --max_epochs 2 \
+ --temperature 2 --num_samples 2 --device 'mps' --save_fig True
 
 """
 
@@ -31,7 +32,7 @@ from evaluation.metrics import evaluate_adversarial_metrics
 from evaluation.metrics import evaluate_model
 from processing.visualize import show_difference
 from processing.visualize import visualize_adversarial
-from processing.distillation import train_student, train_teacher
+from processing.distillation import train_student, train_teacher, load_model
 from evaluation.metrics import calculate_mean_gradient_amplitude, calculate_binned_gradient_amplitude
 from utils.experiment_saver import save_experiment_results
 
@@ -60,6 +61,7 @@ def main(
     num_samples: int,
     device: str,
     save_path: str,
+    save_fig: bool,
 ):
     """
     Main function to train a teacher and a distilled studemt model on cifar, generate adversarial examples, and evaluate the models.
@@ -75,6 +77,7 @@ def main(
         num_samples (int): Number of samples to use for generating adversarial examples.
         device (str): Device to run the training and evaluation on.
         save_path (str): Path to save the experiment results.
+        save_fig (bool): Whether to save figures.
     """
     ssl._create_default_https_context = ssl._create_stdlib_context
 
@@ -146,16 +149,33 @@ def main(
 
     LOGGER.info("\nTraining Teacher Model")
 
-    train_teacher(
+
+    # Load the model
+    teacher_model = load_model(
         teacher_model,
-        trainloader,
-        epochs=max_epochs,
-        criterion=criterion,
-        optimizer=optimizer,
         device=device,
-        save_path=save_path,
+        load_path=save_path,
         model_name=teacher_name,
     )
+
+    # If the model is not loaded (returns None), train and save it
+    if teacher_model is None:
+        LOGGER.info("\nTraining Teacher Model")
+
+        # Initialize the teacher model again
+        teacher_model = Cifar10Net(input_size=w, temperature=temperature, raw_logits=True).to(device)
+
+        # Train the teacher model
+        train_teacher(
+            teacher_model,
+            trainloader,
+            criterion=criterion,
+            optimizer=torch.optim.Adam(teacher_model.parameters(), lr=lr),
+            device=device,
+            epochs=max_epochs,
+            save_path=save_path,
+            model_name=teacher_name,
+        )
 
     # Set to evaluation mode
     teacher_model.eval()
@@ -212,24 +232,36 @@ def main(
         summary_writer=True,
     )
     x_adv_fgm = attack.generate(x=cifar_data_subset, y=cifar_targets_subset)
-    visualize_adversarial(cifar_data_subset, x_adv_fgm, cifar_targets_subset)
+    visualize_adversarial(cifar_data_subset, x_adv_fgm, cifar_targets_subset,
+                          save_fig=save_fig,
+                          save_path='fgsm_t.png')
     show_difference(
-        cifar_data_subset[0][0], x_adv_fgm[0][0], title="Fast-Gradient Method"
+        cifar_data_subset[0][0], x_adv_fgm[0][0], title="Fast-Gradient Method",
+        save_fig=save_fig,
+        save_path='fgsm_diff_t.png'
     )
 
     LOGGER.info("Generating DeepFool Adversarial Examples")
     attack = DeepFool(classifier=art_model_t, epsilon=0.001, max_iter=50, batch_size=32)
     x_adv_deepfool = attack.generate(x=cifar_data_subset, y=cifar_targets_subset)
-    visualize_adversarial(cifar_data_subset, x_adv_deepfool, cifar_targets_subset)
+    visualize_adversarial(cifar_data_subset, x_adv_deepfool, cifar_targets_subset,
+                          save_fig=save_fig,
+                          save_path='deepfool_t.png')
     show_difference(
-        cifar_data_subset[0][0], x_adv_deepfool[0][0], title="Deepfool Method"
+        cifar_data_subset[0][0], x_adv_deepfool[0][0], title="Deepfool Method",
+        save_fig=save_fig,
+        save_path='deepfool_diff_t.png'
     )
 
     LOGGER.info("Generating One Pixel Adversarial Examples")
     attack = PixelAttack(classifier=art_model_t, th=5, es=1, max_iter=50)
     x_adv_pixel = attack.generate(x=cifar_data_subset, y=cifar_targets_subset)
-    visualize_adversarial(cifar_data_subset, x_adv_pixel, cifar_targets_subset)
-    show_difference(cifar_data_subset[0][0], x_adv_pixel[0][0], title="Pixel Method")
+    visualize_adversarial(cifar_data_subset, x_adv_pixel, cifar_targets_subset,
+                          save_fig=save_fig,
+                          save_path='pixel_t.png')
+    show_difference(cifar_data_subset[0][0], x_adv_pixel[0][0], title="Pixel Method",
+                    save_fig=save_fig,
+                    save_path='pixel_diff_t.png')
 
     # Transfer model back to device
     teacher_model.to(device)
@@ -332,24 +364,36 @@ def main(
         summary_writer=True,
     )
     x_adv_fgm_s = attack.generate(x=cifar_data_subset, y=cifar_targets_subset)
-    visualize_adversarial(cifar_data_subset, x_adv_fgm_s, cifar_targets_subset)
+    visualize_adversarial(cifar_data_subset, x_adv_fgm_s, cifar_targets_subset,
+                          save_fig=save_fig,
+                          save_path='fgsm_s.png')
     show_difference(
-        cifar_data_subset[0][0], x_adv_fgm_s[0][0], title="Fast-Gradient Method"
+        cifar_data_subset[0][0], x_adv_fgm_s[0][0], title="Fast-Gradient Method",
+        save_fig=save_fig,
+        save_path='fgsm_diff_s.png'
     )
 
     LOGGER.info("Generating DeepFool Adversarial Examples")
     attack = DeepFool(classifier=art_model_s, epsilon=0.001, max_iter=50, batch_size=32)
     x_adv_deepfool_s = attack.generate(x=cifar_data_subset, y=cifar_targets_subset)
-    visualize_adversarial(cifar_data_subset, x_adv_deepfool_s, cifar_targets_subset)
+    visualize_adversarial(cifar_data_subset, x_adv_deepfool_s, cifar_targets_subset,
+                          save_fig=save_fig,
+                          save_path='deepfool_s.png')
     show_difference(
-        cifar_data_subset[0][0], x_adv_deepfool_s[0][0], title="Deepfool Method"
+        cifar_data_subset[0][0], x_adv_deepfool_s[0][0], title="Deepfool Method",
+        save_fig=save_fig,
+        save_path='deepfool_diff_s.png'
     )
 
     LOGGER.info("Generating One Pixel Adversarial Examples")
     attack = PixelAttack(classifier=art_model_s, th=5, es=1, max_iter=50)
     x_adv_pixel_s = attack.generate(x=cifar_data_subset, y=cifar_targets_subset)
-    visualize_adversarial(cifar_data_subset, x_adv_pixel_s, cifar_targets_subset)
-    show_difference(cifar_data_subset[0][0], x_adv_pixel_s[0][0], title="Pixel Method")
+    visualize_adversarial(cifar_data_subset, x_adv_pixel_s, cifar_targets_subset,
+                          save_fig=save_fig,
+                          save_path='pixel_s.png')
+    show_difference(cifar_data_subset[0][0], x_adv_pixel_s[0][0], title="Pixel Method",
+                    save_fig=save_fig,
+                    save_path='pixel_diff_s.png')
 
     # Transfer model back to device
     student_model.to(device)
@@ -572,7 +616,14 @@ if __name__ == "__main__":
         default="cpu",
         help="Device to run the training and evaluation on.",
     )
+    parser.add_argument(
+        "--save_fig",
+        type=bool,
+        default=False,
+        help="Whether to save figures.",
+    )
     args = parser.parse_args()
+
     # Call the main function with parsed arguments
     main(
         lr=args.lr,
@@ -585,4 +636,5 @@ if __name__ == "__main__":
         num_samples=args.num_samples,
         device=args.device,
         save_path=args.save_path,
+        save_fig=args.save_fig
     )
