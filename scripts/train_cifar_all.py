@@ -181,7 +181,7 @@ def main(
         criterion=criterion,
         optimizer=optimizer,
         device=device,
-        load_path=save_path,
+        save_path=save_path,
         model_name=teacher_name,
     )
 
