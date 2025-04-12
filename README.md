@@ -1,4 +1,4 @@
-# 🛡️ Distillation Defense Experiments
+# 🛡️ REDACT: REsilience through DISTillation Against Complex Threats
 
 ## 🎯 Goal
 
