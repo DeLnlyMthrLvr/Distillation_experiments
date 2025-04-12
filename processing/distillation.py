@@ -78,6 +78,8 @@ def train_teacher(teacher_model, trainloader, criterion, optimizer, device, epoc
         epoch_loss = 0.0
         for images, labels in trainloader:
             images, labels = images.to(device), labels.to(device)
+            
+            images = (images/2.0)+1.0
 
             # Forward pass
             logits = teacher_model(images)
@@ -97,7 +99,7 @@ def train_teacher(teacher_model, trainloader, criterion, optimizer, device, epoc
 
         # Logging every 10 epochs or on the last epoch
         if epoch % 10 == 0 or epoch == epochs - 1:
-            LOGGER.info(f"Epoch {epoch}/{epochs - 1}: Loss = {avg_loss:.4f}")
+            LOGGER.info(f" Epoch {epoch}/{epochs - 1}: Loss = {avg_loss:.4f}")
 
     # Create the full save path with model name
     full_save_path = os.path.join(save_path, f"{model_name}.pth")
@@ -192,6 +194,8 @@ def train_student(
         for images, _ in trainloader:
             images = images.to(device)
 
+            images = (images / 2.0) + 1.0  # Normalize images to [0, 1]
+
             # Get teacher soft labels (detach to prevent gradient flow)
             with torch.no_grad():
                 teacher_logits = teacher_model(images)
@@ -216,7 +220,7 @@ def train_student(
 
         # Logging every 10 epochs or on the last epoch
         if epoch % 10 == 0 or epoch == epochs - 1:
-            LOGGER.info(f"Epoch {epoch}/{epochs - 1}: Loss = {avg_loss:.4f}")
+            LOGGER.info(f" Epoch {epoch}/{epochs - 1}: Loss = {avg_loss:.4f}")
 
     return student_losses
 

@@ -100,7 +100,8 @@ def main(
     n_labels = len(classes)
 
     transform = transforms.Compose(
-        [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+        [transforms.ToTensor(), 
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
     )
 
     # Load CIFAR dataset
@@ -125,7 +126,7 @@ def main(
     criterion = nn.CrossEntropyLoss()
     criterion_dist = nn.KLDivLoss(reduction="batchmean", log_target=True)
 
-    optimizer = optim.AdamW(teacher_model.parameters(), lr=lr)
+    optimizer = optim.SGD(teacher_model.parameters(), lr=lr, momentum=0.9)
 
     # Convert list to tensor first, then change to int and numpy
     cifar_targets = torch.tensor(testset.targets).int().numpy()
@@ -169,7 +170,7 @@ def main(
     # Wrap in ART PyTorchClassifier
     art_model_t = PyTorchClassifier(
         model=teacher_model,
-        clip_values=(-1, 1),  # Min and Max pixel values (normalize if needed)
+        clip_values=(0, 1),  # Min and Max pixel values (normalize if needed)
         loss=criterion,
         optimizer=optimizer,
         input_shape=(n_channels, w, h),
@@ -178,7 +179,7 @@ def main(
 
     # Evaluate model on entire testset
     teacher_accuracy = evaluate_model(
-        art_model_t.model, cifar_data, cifar_targets, device=device
+        art_model_t.model, cifar_data/255, cifar_targets, device=device
     )
     LOGGER.info(f"Test Accuracy: {teacher_accuracy:.2f}%")
     
@@ -250,7 +251,7 @@ def main(
     # Wrap in ART PyTorchClassifier
     art_model_s = PyTorchClassifier(
         model=student_model,
-        clip_values=(-1, 1),  # Min and Max pixel values (normalize if needed)
+        clip_values=(0, 1),  # Min and Max pixel values (normalize if needed)
         loss=criterion_dist,
         optimizer=optimizer,
         input_shape=(n_channels, w, h),
@@ -398,7 +399,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--save_path",
         type=str,
-        default="experiments/cifar_jacobian_results.csv",
+        default="experiments/cifar_jacobian_exper",
         help="Path to save the experiment results.",
     )
     parser.add_argument(
