@@ -31,7 +31,7 @@ from evaluation.metrics import evaluate_adversarial_metrics
 from evaluation.metrics import evaluate_model
 from processing.visualize import show_difference
 from processing.visualize import visualize_adversarial
-from processing.distillation import train_student, train_teacher
+from processing.distillation import train_student, train_teacher, load_model
 from evaluation.metrics import calculate_mean_gradient_amplitude, calculate_binned_gradient_amplitude
 from utils.experiment_saver import save_experiment_results
 
@@ -146,16 +146,33 @@ def main(
 
     LOGGER.info("\nTraining Teacher Model")
 
-    train_teacher(
+
+    # Load the model
+    teacher_model = load_model(
         teacher_model,
-        trainloader,
-        epochs=max_epochs,
-        criterion=criterion,
-        optimizer=optimizer,
         device=device,
-        save_path=save_path,
+        load_path=save_path,
         model_name=teacher_name,
     )
+
+    # If the model is not loaded (returns None), train and save it
+    if teacher_model is None:
+        LOGGER.info("\nTraining Teacher Model")
+
+        # Initialize the teacher model again
+        teacher_model = Cifar10Net(input_size=w, temperature=temperature, raw_logits=True).to(device)
+
+        # Train the teacher model
+        train_teacher(
+            teacher_model,
+            trainloader,
+            criterion=criterion,
+            optimizer=torch.optim.Adam(teacher_model.parameters(), lr=lr),
+            device=device,
+            epochs=max_epochs,
+            save_path=save_path,
+            model_name=teacher_name,
+        )
 
     # Set to evaluation mode
     teacher_model.eval()
