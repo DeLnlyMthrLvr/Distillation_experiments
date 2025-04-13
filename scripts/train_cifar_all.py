@@ -6,7 +6,9 @@ and evaluates the models' performance on both clean and adversarial data.
 
 To run the script you can use the following command, adjusting argumments as needed:
 ipython scripts/train_cifar_all.py -- --lr 0.01 --batch_size 128 --max_epochs 50 \
---temperature 10 --num_samples 100 --device 'mps' --save_fig False --headless True
+--temperature 10 --num_samples 100 --device 'mps' --save_fig False --headless
+
+# note cannot run save_fig and headless at the same time.
 
 """
 
@@ -245,7 +247,10 @@ def main(
     if device == "mps":
         teacher_model.to("cpu")
 
+    LOGGER.info(f'YOOOOOOO:{headless}')
+
     if not headless:
+        LOGGER.info("YOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
         visualize_adversarial(
             expanded_data,
             x_adv,
@@ -275,7 +280,7 @@ def main(
     if not headless:
         visualize_adversarial(cifar_data_subset, x_adv_fgm, cifar_targets_subset)
         show_difference(
-            cifar_data_subset[0][0], x_adv_fgm[0][0], title="Fast-Gradient Method"
+            cifar_data_subset[0][0], x_adv_fgm[0][0], title="Fast-Gradient Method", save_fig=save_fig, save_path="fgm_t.png"
         )
 
     LOGGER.info("Generating DeepFool Adversarial Examples")
@@ -284,7 +289,7 @@ def main(
     if not headless:
         visualize_adversarial(cifar_data_subset, x_adv_deepfool, cifar_targets_subset)
         show_difference(
-            cifar_data_subset[0][0], x_adv_deepfool[0][0], title="Deepfool Method"
+            cifar_data_subset[0][0], x_adv_deepfool[0][0], title="Deepfool Method", save_fig=save_fig, save_path="deepfool_t.png"
         )
 
     LOGGER.info("Generating One Pixel Adversarial Examples")
@@ -293,7 +298,7 @@ def main(
     if not headless:
         visualize_adversarial(cifar_data_subset, x_adv_pixel, cifar_targets_subset)
         show_difference(
-            cifar_data_subset[0][0], x_adv_pixel[0][0], title="Pixel Method"
+            cifar_data_subset[0][0], x_adv_pixel[0][0], title="Pixel Method",  save_fig=save_fig, save_path="pixel_t.png"
         )
 
     # Transfer model back to device
@@ -436,7 +441,7 @@ def main(
     if not headless:
         visualize_adversarial(cifar_data_subset, x_adv_fgm_s, cifar_targets_subset)
         show_difference(
-            cifar_data_subset[0][0], x_adv_fgm_s[0][0], title="Fast-Gradient Method"
+            cifar_data_subset[0][0], x_adv_fgm_s[0][0], title="Fast-Gradient Method", save_fig=save_fig, save_path="fgm_s.png"
         )
 
     LOGGER.info("Generating DeepFool Adversarial Examples")
@@ -445,7 +450,7 @@ def main(
     if not headless:
         visualize_adversarial(cifar_data_subset, x_adv_deepfool_s, cifar_targets_subset)
         show_difference(
-            cifar_data_subset[0][0], x_adv_deepfool_s[0][0], title="Deepfool Method"
+            cifar_data_subset[0][0], x_adv_deepfool_s[0][0], title="Deepfool Method", save_fig=save_fig, save_path="deepfool_s.png"
         )
 
     LOGGER.info("Generating One Pixel Adversarial Examples")
@@ -454,7 +459,7 @@ def main(
     if not headless:
         visualize_adversarial(cifar_data_subset, x_adv_pixel_s, cifar_targets_subset)
         show_difference(
-            cifar_data_subset[0][0], x_adv_pixel_s[0][0], title="Pixel Method"
+            cifar_data_subset[0][0], x_adv_pixel_s[0][0], title="Pixel Method", save_fig=save_fig, save_path="pixel_s.png"
         )
 
     # Transfer model back to device

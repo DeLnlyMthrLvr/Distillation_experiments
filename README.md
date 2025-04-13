@@ -92,7 +92,7 @@ This repository utilizes several adversarial attacks implemented by the [Adversa
 
 ## ⚙️ Environment Setup
 
-Below are instructions in order to setup all pre-requisites before running the code.
+Below are instructions in order to setup all pre-requisites before running the code. [Link to download the weights](https://drive.google.com/drive/folders/1bBpo2KRREg61FNtdoBl2lN34wxgqORAR?usp=drive_link).
 
 ### 🧰 1. Create the environment and install dependencies
 
