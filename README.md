@@ -112,9 +112,9 @@ After setup, activate the environment:
 - On Windows (Command Prompt), run `env\Scripts\activate.bat`
 - On Windows (PowerShell), run `env\Scripts\Activate.ps1`
 
-### 🧠 3. Install PyTorch (CPU-only, manual step)
+### 🧠 3. Install PyTorch ( manual step)
 
-To avoid compatibility issues with CUDA and GPU drivers, install the CPU-only version of PyTorch manually. Run `pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu` inside the activated environment.
+To avoid compatibility issues with CUDA and GPU drivers, here is install the CPU-only version of PyTorch manually. Run `pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu` inside the activated environment. For the GPU version (cuda) run `pip install torch torchvision`.
 
 ### ✅ 4. Run a quick test
 
