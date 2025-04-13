@@ -60,6 +60,8 @@ e.g. ipython scripts/train_cifar_all.py -- --lr 0.01 --batch_size 128 --max_epoc
 | `--headless`   | `True`                           |Headless (No gui)|
 | `--save_fig`   | `False`                          | Save figures or not |
 
+NOTE: the distillation process has a fixed learning rate of 0.0001.
+
 ### MNIST
 
 | Argument       | Default        | Description |
