@@ -247,10 +247,8 @@ def main(
     if device == "mps":
         teacher_model.to("cpu")
 
-    LOGGER.info(f'YOOOOOOO:{headless}')
 
     if not headless:
-        LOGGER.info("YOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
         visualize_adversarial(
             expanded_data,
             x_adv,
