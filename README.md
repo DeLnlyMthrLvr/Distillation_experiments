@@ -41,7 +41,7 @@ For training and evaluation. Located in `scripts/`:
 
 ## ⚙️ Command-Line Arguments
 
-e.g. ipython scripts/train_cifar_jacobian_attack.py -- --lr 0.001 --batch_size 256 --max_epochs 50 --device 'mps'
+e.g. ipython scripts/train_cifar_all.py -- --lr 0.01 --batch_size 128 --max_epochs 50 --device 'cuda'
 
 ### CIFAR-10
 
@@ -56,8 +56,8 @@ e.g. ipython scripts/train_cifar_jacobian_attack.py -- --lr 0.001 --batch_size 2
 | `--save_path`  | `"experiments/cifar_jacobian_exper"` | Where to store experiment results |
 | `--temperature`| `20`                             | Softmax temperature |
 | `--num_samples`| `100`                            | Number of adversarial samples |
-| `--device`     | `"cpu"`                   | Device to use ('cpu', 'cuda', 'mps', etc.) |
-| `--headless`   | `False`                           |Headless (No gui)|
+| `--device`     | `"cpu"/"cuda" (if available)`                   | Device to use ('cpu', 'cuda', 'mps', etc.) |
+| `--headless`   | `True`                           |Headless (No gui)|
 | `--save_fig`   | `False`                          | Save figures or not |
 
 ### MNIST
