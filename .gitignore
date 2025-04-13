@@ -1,1 +1,16 @@
-notebooks/data/*
+# No notebooks
+notebooks/
+# No runs
+runs
+# No pycache
+__pycache__/
+# No experiment csv and models
+experiments/
+experiments_jsma/
+# No data
+data/
+# git stuff
+.DS_Store
+# images
+*.png
+*.jpg
