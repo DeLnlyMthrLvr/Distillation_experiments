@@ -120,13 +120,17 @@ def main(
     )
 
     # Define a simple CNN model for MNIST classification
-    teacher_model = MnistNet(input_size=w, temperature=temperature, raw_logits=True).to(device)
-    student_model = MnistNet(input_size=w, temperature=temperature, raw_logits=False).to(device)
+    teacher_model = MnistNet(input_size=w, temperature=temperature, raw_logits=True).to(
+        device
+    )
+    student_model = MnistNet(
+        input_size=w, temperature=temperature, raw_logits=False
+    ).to(device)
 
     # Specify the loss function and optimizer for teacher model
     criterion = nn.CrossEntropyLoss()
     criterion_dist = nn.KLDivLoss(reduction="batchmean", log_target=True)
-    #criterion_dist = lambda student_logits, soft_labels: soft_cross_entropy(student_logits, soft_labels, temperature) * temperature * temperature
+    # criterion_dist = lambda student_logits, soft_labels: soft_cross_entropy(student_logits, soft_labels, temperature) * temperature * temperature
 
     optimizer = optim.AdamW(teacher_model.parameters(), lr=lr)
 
@@ -146,7 +150,9 @@ def main(
 
     ## Teacher Model
 
-    teacher_name = f"mnist_teacher_model_temp{temperature}_ep{max_epochs}_lr{lr}_batch{batch_size}"
+    teacher_name = (
+        f"mnist_teacher_model_temp{temperature}_ep{max_epochs}_lr{lr}_batch{batch_size}"
+    )
 
     # Load the model
     teacher_model = load_model(
@@ -197,7 +203,7 @@ def main(
     )
     LOGGER.info(f"Test Accuracy: {teacher_accuracy:.2f}%")
 
-   # Criterion needs logits
+    # Criterion needs logits
     teacher_model.raw_logits = True
 
     # Display Gradient Amplitude
@@ -210,7 +216,7 @@ def main(
 
     # Apply softmax probabilities during inference
     teacher_model.raw_logits = False
-    
+
     # Ensure teacher model is not on mps to create the attacks
     if device == "mps":
         teacher_model.to("cpu")
@@ -238,7 +244,9 @@ def main(
     LOGGER.info("Generating DeepFool Adversarial Examples")
     attack = DeepFool(classifier=art_model_t, epsilon=0.001, max_iter=50, batch_size=32)
     x_adv_deepfool = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
-    visualize_adversarial(mnist_data_subset, x_adv_deepfool, mnist_targets_subset, rgb=False)
+    visualize_adversarial(
+        mnist_data_subset, x_adv_deepfool, mnist_targets_subset, rgb=False
+    )
     show_difference(
         mnist_data_subset[0][0], x_adv_deepfool[0][0], title="Deepfool Method"
     )
@@ -246,7 +254,9 @@ def main(
     LOGGER.info("Generating One Pixel Adversarial Examples")
     attack = PixelAttack(classifier=art_model_t, th=5, es=1, max_iter=50)
     x_adv_pixel = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
-    visualize_adversarial(mnist_data_subset, x_adv_pixel, mnist_targets_subset, rgb=False)
+    visualize_adversarial(
+        mnist_data_subset, x_adv_pixel, mnist_targets_subset, rgb=False
+    )
     show_difference(mnist_data_subset[0][0], x_adv_pixel[0][0], title="Pixel Method")
 
     # Transfer model back to device
@@ -301,7 +311,7 @@ def main(
     )
 
     # Set to evaluation mode
-    student_model.eval()   
+    student_model.eval()
     # Set model temperature to 1 after training
     student_model.temperature = 1.0
 
@@ -321,10 +331,8 @@ def main(
     )
     LOGGER.info(f"Test Accuracy: {student_accuracy:.2f}%")
 
-
     # Criterion needs logits
-    student_model.raw_logits = True 
-
+    student_model.raw_logits = True
 
     # Display Gradient Amplitude
     LOGGER.info(
@@ -353,7 +361,9 @@ def main(
         summary_writer=True,
     )
     x_adv_fgm_s = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
-    visualize_adversarial(mnist_data_subset, x_adv_fgm_s, mnist_targets_subset, rgb=False)
+    visualize_adversarial(
+        mnist_data_subset, x_adv_fgm_s, mnist_targets_subset, rgb=False
+    )
     show_difference(
         mnist_data_subset[0][0], x_adv_fgm_s[0][0], title="Fast-Gradient Method"
     )
@@ -361,7 +371,9 @@ def main(
     LOGGER.info("Generating DeepFool Adversarial Examples")
     attack = DeepFool(classifier=art_model_s, epsilon=0.001, max_iter=50, batch_size=32)
     x_adv_deepfool_s = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
-    visualize_adversarial(mnist_data_subset, x_adv_deepfool_s, mnist_targets_subset, rgb=False)
+    visualize_adversarial(
+        mnist_data_subset, x_adv_deepfool_s, mnist_targets_subset, rgb=False
+    )
     show_difference(
         mnist_data_subset[0][0], x_adv_deepfool_s[0][0], title="Deepfool Method"
     )
@@ -369,14 +381,16 @@ def main(
     LOGGER.info("Generating One Pixel Adversarial Examples")
     attack = PixelAttack(classifier=art_model_s, th=5, es=1, max_iter=50)
     x_adv_pixel_s = attack.generate(x=mnist_data_subset, y=mnist_targets_subset)
-    visualize_adversarial(mnist_data_subset, x_adv_pixel_s, mnist_targets_subset, rgb=False)
+    visualize_adversarial(
+        mnist_data_subset, x_adv_pixel_s, mnist_targets_subset, rgb=False
+    )
     show_difference(mnist_data_subset[0][0], x_adv_pixel_s[0][0], title="Pixel Method")
 
     # Transfer model back to device
     student_model.to(device)
 
     # Apply softmax probabilities during inference
-    student_model.raw_logits = False    
+    student_model.raw_logits = False
 
     # Evaluate the student model on adversarial examples
     LOGGER.info("Evaluating Student Model on Student-based Adversarial Examples:")

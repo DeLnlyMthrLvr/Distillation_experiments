@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 
 class Cifar10Net(nn.Module):
-    def __init__(self, input_size=32, temperature=1, raw_logits=True): 
+    def __init__(self, input_size=32, temperature=1, raw_logits=True):
         """
         A simple CNN model for CIFAR-10 classification.
         Args:
@@ -33,7 +33,7 @@ class Cifar10Net(nn.Module):
         self.dropout = nn.Dropout(p=0.5)
 
         self.temperature = temperature
-        self.raw_logits = raw_logits        
+        self.raw_logits = raw_logits
 
     def _get_conv_output(self, size):
         """Helper function to compute the output size after convolutions"""
@@ -50,7 +50,6 @@ class Cifar10Net(nn.Module):
         x = self.activation(self.conv2a(x))
         x = self.activation(self.conv2b(x))
         x = self.pool(x)
-
 
         x = self.flatten(x)  # Flatten before FC layers
         x = self.dropout(x)

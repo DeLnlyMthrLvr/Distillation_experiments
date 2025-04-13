@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 
 class MnistNet(nn.Module):
-    def __init__(self, input_size=28, temperature=1, raw_logits=True): 
+    def __init__(self, input_size=28, temperature=1, raw_logits=True):
         """
         A simple CNN model for MNIST classification.
         Args:

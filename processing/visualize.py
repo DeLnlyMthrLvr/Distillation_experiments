@@ -4,7 +4,9 @@ import matplotlib.pyplot as plt
 import random
 
 
-def show_difference(original, adversarial, title="Method", save_fig=False, save_path='figure.png'):
+def show_difference(
+    original, adversarial, title="Method", save_fig=False, save_path="figure.png"
+):
     """
     Displays the original and adversarial images side by side, along with their difference.
     :param original: Original image (NumPy array or PyTorch Tensor).
@@ -35,8 +37,15 @@ def show_difference(original, adversarial, title="Method", save_fig=False, save_
     plt.show()
 
 
-def visualize_adversarial(data, adversarial_data, labels, rgb=True, num_samples=5, 
-                          save_fig=False, save_path='figure.png'):
+def visualize_adversarial(
+    data,
+    adversarial_data,
+    labels,
+    rgb=True,
+    num_samples=5,
+    save_fig=False,
+    save_path="figure.png",
+):
     """
     Displays a comparison of original and adversarial images for a subset of samples.
 
@@ -67,7 +76,9 @@ def visualize_adversarial(data, adversarial_data, labels, rgb=True, num_samples=
     for i, idx in enumerate(indices):
         # Original Image
         if rgb:
-            axes[i, 0].imshow(((np.transpose(data[idx].squeeze(), (1, 2, 0)))*255).astype(np.uint8))
+            axes[i, 0].imshow(
+                ((np.transpose(data[idx].squeeze(), (1, 2, 0))) * 255).astype(np.uint8)
+            )
         else:
             axes[i, 0].imshow(data[idx].squeeze(), cmap="gray")
         axes[i, 0].set_title(f"Original (Label: {labels[idx]})")
@@ -75,7 +86,11 @@ def visualize_adversarial(data, adversarial_data, labels, rgb=True, num_samples=
 
         # Adversarial Image
         if rgb:
-            axes[i, 1].imshow(((np.transpose(adversarial_data[idx].squeeze(), (1, 2, 0)))*255).astype(np.uint8))
+            axes[i, 1].imshow(
+                (
+                    (np.transpose(adversarial_data[idx].squeeze(), (1, 2, 0))) * 255
+                ).astype(np.uint8)
+            )
         else:
             axes[i, 1].imshow(adversarial_data[idx].squeeze(), cmap="gray")
         axes[i, 1].set_title("Adversarial")
@@ -86,11 +101,19 @@ def visualize_adversarial(data, adversarial_data, labels, rgb=True, num_samples=
     # Whether to save the figure
     if save_fig:
         plt.savefig(save_path, transparent=True)
-        
+
     plt.show()
 
 
-def visualize_from_dataloader(model, dataloader, temp, rgb=True, device="cpu", save_fig=True, save_path='figure.png'):
+def visualize_from_dataloader(
+    model,
+    dataloader,
+    temp,
+    rgb=True,
+    device="cpu",
+    save_fig=True,
+    save_path="figure.png",
+):
     """
     Selects a random MNIST image from the dataset, gets its label, and computes its soft labels.
 
@@ -121,9 +144,15 @@ def visualize_from_dataloader(model, dataloader, temp, rgb=True, device="cpu", s
 
     # Display image and labels
     if rgb:
-        plt.imshow((((np.transpose(image.squeeze().cpu(), (1, 2, 0))+1.0)/2)*255).astype(np.uint8))
+        plt.imshow(
+            (((np.transpose(image.squeeze().cpu(), (1, 2, 0)) + 1.0) / 2) * 255).astype(
+                np.uint8
+            )
+        )
     else:
-        plt.imshow(image.squeeze().cpu(), cmap="gray")  # Use grayscale colormap for MNIST
+        plt.imshow(
+            image.squeeze().cpu(), cmap="gray"
+        )  # Use grayscale colormap for MNIST
     plt.title(f"True Label: {label}\nSoft Labels: {soft_labels.round(2)}")
     plt.axis("off")
 
