@@ -77,6 +77,19 @@ e.g. ipython scripts/train_cifar_jacobian_attack.py -- --lr 0.001 --batch_size 2
 
 ---
 
+## 📌 Attack Methods Used
+
+This repository utilizes several adversarial attacks implemented by the [Adversarial Robustness Toolbox (ART)](https://github.com/Trusted-AI/adversarial-robustness-toolbox). Below is a summary of the attack types and their characteristics:
+
+| Attack Name       | Type             | Targeted | Description |
+|------------------|------------------|----------|-------------|
+| **FGSM**          | Gradient-based   | ❌        | Fast Gradient Sign Method perturbs input in the direction of the gradient. Simple and fast. |
+| **DeepFool**      | Iterative        | ❌        | Computes minimal perturbations required to change model prediction using a linearization approach. |
+| **One-Pixel**     | Evolutionary     | ❌        | Black-box attack that perturbs just one pixel to fool the model using differential evolution. |
+| **JSMA**          | Gradient-based   | ✅        | Jacobian Saliency Map Attack — alters specific input features to force misclassification into a *target* class. Unlike other attacks, JSMA is targeted: for each sample, we generate **9** targeted adversarial examples (excluding the true class), resulting in `9 × num_samples` samples for both MNIST and CIFAR-10. |
+
+---
+
 ## ⚙️ Environment Setup
 
 Below are instructions in order to setup all pre-requisites before running the code.
@@ -109,13 +122,13 @@ To verify everything works correctly, run `make test`. This executes a minimal t
 
 To delete the environment and start fresh, run `make clean`. This removes the `env` folder and all installed dependencies.
 
+---
 
 ## 📖 Paper Reference
 
 > **Distillation as a Defense to Adversarial Perturbations against Deep Neural Networks**  
 > Nicolas Papernot, Patrick McDaniel, Xi Wu, Somesh Jha, Ananthram Swami  
 > [IEEE S&P 2016](https://arxiv.org/abs/1511.04508)
-
 
 ---
 
