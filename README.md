@@ -56,8 +56,8 @@ e.g. ipython scripts/train_cifar_jacobian_attack.py -- --lr 0.001 --batch_size 2
 | `--save_path`  | `"experiments/cifar_jacobian_exper"` | Where to store experiment results |
 | `--temperature`| `20`                             | Softmax temperature |
 | `--num_samples`| `100`                            | Number of adversarial samples |
-| `--device`     | `"cuda"/"cpu"`                          | Device to use |
-| `--headless`   | `True`|Headless (No gui)|
+| `--device`     | `"cpu"`                   | Device to use ('cpu', 'cuda', 'mps', etc.) |
+| `--headless`   | `False`                           |Headless (No gui)|
 | `--save_fig`   | `False`                          | Save figures or not |
 
 ### MNIST
@@ -73,7 +73,7 @@ e.g. ipython scripts/train_cifar_jacobian_attack.py -- --lr 0.001 --batch_size 2
 | `--save_path`  | `"experiments/"` | Where to store experiment results |
 | `--temperature`| `20`           | Softmax temperature |
 | `--num_samples`| `100`          | Number of adversarial samples |
-| `--device`     | `"cpu"`        | Device to use |
+| `--device`     | `"cpu"`        | Device to use ('cpu', 'cuda', 'mps', etc.) |
 
 ---
 
@@ -99,7 +99,7 @@ After setup, activate the environment:
 
 ### 🧠 3. Install PyTorch (CPU-only, manual step)
 
-To avoid compatibility issues with CUDA and GPU drivers, install the CPU-only version of PyTorch manually. Run `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu` inside the activated environment.
+To avoid compatibility issues with CUDA and GPU drivers, install the CPU-only version of PyTorch manually. Run `pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu` inside the activated environment.
 
 ### ✅ 4. Run a quick test
 

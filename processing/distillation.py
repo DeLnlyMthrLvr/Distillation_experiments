@@ -3,7 +3,7 @@ from torch import nn
 from tqdm import tqdm
 import torch.optim as optim
 import logging
-import os 
+import os
 from torch.nn import functional as F
 
 
@@ -43,8 +43,16 @@ def distillation_loss(student_logits, teacher_soft_labels, hard_labels, temp, al
     return alpha * soft_loss + (1 - alpha) * hard_loss
 
 
-
-def train_teacher(teacher_model, trainloader, criterion, optimizer, device, epochs, save_path="experiments/", model_name="teacher_model"):
+def train_teacher(
+    teacher_model,
+    trainloader,
+    criterion,
+    optimizer,
+    device,
+    epochs,
+    save_path="experiments/",
+    model_name="teacher_model",
+):
     """
     Train the teacher model.
 
@@ -78,8 +86,8 @@ def train_teacher(teacher_model, trainloader, criterion, optimizer, device, epoc
         epoch_loss = 0.0
         for images, labels in trainloader:
             images, labels = images.to(device), labels.to(device)
-            
-            images = (images/2.0)+1.0
+
+            images = (images / 2.0) + 1.0
 
             # Forward pass
             logits = teacher_model(images)
@@ -114,7 +122,6 @@ def train_teacher(teacher_model, trainloader, criterion, optimizer, device, epoc
     return teacher_losses
 
 
-
 def load_model(model, device, load_path, model_name="teacher_model"):
     """
     Load the model from the specified path if it exists.
@@ -144,7 +151,7 @@ def load_model(model, device, load_path, model_name="teacher_model"):
         LOGGER.warning(f"Model not found at {full_path}.")
         return None
 
-    
+
 def soft_cross_entropy(student_logits, soft_labels, T):
     student_log_probs = F.log_softmax(student_logits / T, dim=1)
     return -(soft_labels * student_log_probs).sum(dim=1).mean()
@@ -223,7 +230,6 @@ def train_student(
             LOGGER.info(f" Epoch {epoch}/{epochs - 1}: Loss = {avg_loss:.4f}")
 
     return student_losses
-
 
 
 def train_student_two_losses(

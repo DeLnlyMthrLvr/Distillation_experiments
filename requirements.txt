@@ -1,5 +1,6 @@
 numpy
 matplotlib
 scikit-learn
+tensorboardX
 tqdm
 adversarial-robustness-toolbox==1.19.0

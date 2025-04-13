@@ -6,9 +6,10 @@ and evaluates the models' performance on both clean and adversarial data.
 
 To run the script you can use the following command, adjusting argumments as needed:
 ipython scripts/train_cifar_all.py -- --lr 0.01 --batch_size 128 --max_epochs 50 \
---temperature 2 --num_samples 100 --device 'cuda' --save_fig False --headless False
+--temperature 10 --num_samples 100 --device 'mps' --save_fig False --headless True
 
 """
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -33,7 +34,10 @@ from processing.visualize import show_difference
 from processing.visualize import visualize_adversarial
 from processing.distillation import train_student, train_teacher, load_model
 
-from evaluation.metrics import calculate_mean_gradient_amplitude, calculate_binned_gradient_amplitude
+from evaluation.metrics import (
+    calculate_mean_gradient_amplitude,
+    calculate_binned_gradient_amplitude,
+)
 from utils.experiment_saver import save_experiment_results
 
 
@@ -105,8 +109,7 @@ def main(
     n_labels = len(classes)
 
     transform = transforms.Compose(
-        [transforms.ToTensor(), 
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+        [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
     )
 
     # Load CIFAR dataset
@@ -123,8 +126,9 @@ def main(
         testset, batch_size=batch_size, shuffle=False
     )
 
-    
-    teacher_name = f"cifar_teacher_model_temp{temperature}_ep{max_epochs}_lr{lr}_batch{batch_size}"
+    teacher_name = (
+        f"cifar_teacher_model_temp{temperature}_ep{max_epochs}_lr{lr}_batch{batch_size}"
+    )
 
     # Load the model
     teacher_model = load_model(
@@ -136,11 +140,15 @@ def main(
 
     if teacher_model is None:
         # Define a simple CNN model for CIFAR-10 classification
-        teacher_model = Cifar10Net(input_size=w, temperature=temperature, raw_logits=True).to(device)
+        teacher_model = Cifar10Net(
+            input_size=w, temperature=temperature, raw_logits=True
+        ).to(device)
         training = True
     else:
         training = False
-    student_model = Cifar10Net(input_size=w, temperature=temperature, raw_logits=False).to(device)
+    student_model = Cifar10Net(
+        input_size=w, temperature=temperature, raw_logits=False
+    ).to(device)
 
     # Specify the loss function and optimizer for teacher model
     criterion = nn.CrossEntropyLoss()
@@ -165,26 +173,21 @@ def main(
 
     ## Teacher Model
 
-
-
-
-    
     # If the model is not loaded (returns None), train and save it
     if training:
         LOGGER.info("\nTraining Teacher Model")
 
         # Train the teacher model
         train_teacher(
-        teacher_model,
-        trainloader,
-        epochs=max_epochs,
-        criterion=criterion,
-        optimizer=optimizer,
-        device=device,
-        save_path=save_path,
-        model_name=teacher_name,
-    )
-
+            teacher_model,
+            trainloader,
+            epochs=max_epochs,
+            criterion=criterion,
+            optimizer=optimizer,
+            device=device,
+            save_path=save_path,
+            model_name=teacher_name,
+        )
 
     # Set to evaluation mode
     teacher_model.eval()
@@ -205,10 +208,10 @@ def main(
 
     # Evaluate model on entire testset
     teacher_accuracy = evaluate_model(
-        art_model_t.model, cifar_data/255, cifar_targets, device=device
+        art_model_t.model, cifar_data / 255, cifar_targets, device=device
     )
     LOGGER.info(f"Test Accuracy: {teacher_accuracy:.2f}%")
-    
+
     # Criterion needs logits
     teacher_model.raw_logits = True
 
@@ -222,27 +225,42 @@ def main(
     # Apply softmax probabilities during inference
     teacher_model.raw_logits = False
 
-    # Ensure teacher model is not on mps to create the attacks
-    if device == "mps":
-        teacher_model.to("cpu")
-
     # Adversarial attacks
     # Generate Adversarial Examples from the Teacher Model
     LOGGER.info("\nGenerating Adversarial Examples from Teacher Model:")
 
     LOGGER.info("Generating Jacobian-Saliency Adversarial Examples")
 
-    expanded_data, expanded_labels, x_adv, y_adv = generate_adversarial_samples(cifar_data_subset, cifar_targets_subset, art_model_t, theta=0.40, gamma=0.50, batch_size=32, device=device)
+    expanded_data, expanded_labels, x_adv, y_adv = generate_adversarial_samples(
+        cifar_data_subset,
+        cifar_targets_subset,
+        art_model_t,
+        theta=0.40,
+        gamma=0.50,
+        batch_size=32,
+        device=device,
+    )
+
+    # Ensure teacher model is not on mps to create the attacks
+    if device == "mps":
+        teacher_model.to("cpu")
 
     if not headless:
-        visualize_adversarial(expanded_data, x_adv, expanded_labels, save_fig=save_fig,
-                          save_path='jsma_t.png')
-        show_difference(
-            expanded_data[0][0], x_adv[0][0], title="Jacobian-Saliency Map Method", save_fig=save_fig,
-            save_path='jsma_diff_t.png'
+        visualize_adversarial(
+            expanded_data,
+            x_adv,
+            expanded_labels,
+            save_fig=save_fig,
+            save_path="jsma_t.png",
         )
-        
-    
+        show_difference(
+            expanded_data[0][0],
+            x_adv[0][0],
+            title="Jacobian-Saliency Map Method",
+            save_fig=save_fig,
+            save_path="jsma_diff_t.png",
+        )
+
     LOGGER.info("Generating FSGM Adversarial Examples")
     attack = FastGradientMethod(
         estimator=art_model_t,
@@ -259,7 +277,6 @@ def main(
         show_difference(
             cifar_data_subset[0][0], x_adv_fgm[0][0], title="Fast-Gradient Method"
         )
-        
 
     LOGGER.info("Generating DeepFool Adversarial Examples")
     attack = DeepFool(classifier=art_model_t, epsilon=0.001, max_iter=50, batch_size=32)
@@ -275,15 +292,16 @@ def main(
     x_adv_pixel = attack.generate(x=cifar_data_subset, y=cifar_targets_subset)
     if not headless:
         visualize_adversarial(cifar_data_subset, x_adv_pixel, cifar_targets_subset)
-        show_difference(cifar_data_subset[0][0], x_adv_pixel[0][0], title="Pixel Method")
+        show_difference(
+            cifar_data_subset[0][0], x_adv_pixel[0][0], title="Pixel Method"
+        )
 
-    
     # Transfer model back to device
     teacher_model.to(device)
 
     # Evaluate the teacher model on adversarial examples
     LOGGER.info("Evaluating Teacher Model on Teacher-based Adversarial Examples:")
-    
+
     LOGGER.info(
         evaluate_adversarial_metrics(
             art_model_t.model,
@@ -339,9 +357,9 @@ def main(
     )
 
     # Set to evaluation mode
-    student_model.eval()   
+    student_model.eval()
     # Set model temperature to 1 after training
-    student_model.temperature = 1.0    
+    student_model.temperature = 1.0
 
     # Wrap in ART PyTorchClassifier
     art_model_s = PyTorchClassifier(
@@ -355,12 +373,12 @@ def main(
 
     # Evaluate model on entire testset
     student_accuracy = evaluate_model(
-        art_model_s.model, cifar_data/255, cifar_targets, device=device
+        art_model_s.model, cifar_data / 255, cifar_targets, device=device
     )
     LOGGER.info(f"Test Accuracy: {student_accuracy:.2f}%")
 
     # Criterion needs logits
-    student_model.raw_logits = True 
+    student_model.raw_logits = True
 
     LOGGER.info(
         f"Mean Gradient Amplitude: {calculate_mean_gradient_amplitude(art_model_s.model, cifar_data, cifar_targets, criterion, device=device)}"
@@ -375,14 +393,34 @@ def main(
 
     LOGGER.info("Generating Jacobian-Saliency Adversarial Examples")
 
-    expanded_data, expanded_labels, x_adv_s, y_adv = generate_adversarial_samples(cifar_data_subset, cifar_targets_subset, art_model_s, theta=0.40, gamma=0.50, batch_size=32, device=device)
+    expanded_data, expanded_labels, x_adv_s, y_adv = generate_adversarial_samples(
+        cifar_data_subset,
+        cifar_targets_subset,
+        art_model_s,
+        theta=0.40,
+        gamma=0.50,
+        batch_size=32,
+        device=device,
+    )
 
+    # Ensure teacher model is not on mps to create the attacks
+    if device == "mps":
+        student_model.to("cpu")
 
     if not headless:
-        visualize_adversarial(expanded_data, x_adv_s, expanded_labels, save_fig=save_fig, save_path="jsma_s.png")
+        visualize_adversarial(
+            expanded_data,
+            x_adv_s,
+            expanded_labels,
+            save_fig=save_fig,
+            save_path="jsma_s.png",
+        )
         show_difference(
-            expanded_data[0][0], x_adv_s[0][0], title="Jacobian-Saliency Method", save_fig=save_fig, 
-            save_path="jsma_diff_s.png"
+            expanded_data[0][0],
+            x_adv_s[0][0],
+            title="Jacobian-Saliency Method",
+            save_fig=save_fig,
+            save_path="jsma_diff_s.png",
         )
 
     LOGGER.info("Generating FSGM Adversarial Examples")
@@ -400,7 +438,6 @@ def main(
         show_difference(
             cifar_data_subset[0][0], x_adv_fgm_s[0][0], title="Fast-Gradient Method"
         )
-        
 
     LOGGER.info("Generating DeepFool Adversarial Examples")
     attack = DeepFool(classifier=art_model_s, epsilon=0.001, max_iter=50, batch_size=32)
@@ -416,7 +453,9 @@ def main(
     x_adv_pixel_s = attack.generate(x=cifar_data_subset, y=cifar_targets_subset)
     if not headless:
         visualize_adversarial(cifar_data_subset, x_adv_pixel_s, cifar_targets_subset)
-        show_difference(cifar_data_subset[0][0], x_adv_pixel_s[0][0], title="Pixel Method")
+        show_difference(
+            cifar_data_subset[0][0], x_adv_pixel_s[0][0], title="Pixel Method"
+        )
 
     # Transfer model back to device
     student_model.to(device)
@@ -426,7 +465,7 @@ def main(
 
     # Evaluate the teacher model on adversarial examples
     LOGGER.info("Evaluating Student Model on Student-based Adversarial Examples:")
-    
+
     LOGGER.info(
         evaluate_adversarial_metrics(
             art_model_s.model,
@@ -451,7 +490,7 @@ def main(
     )
 
     LOGGER.info("Evaluating Teacher Model on Student-based Adversarial Examples:")
-    
+
     LOGGER.info(
         evaluate_adversarial_metrics(
             art_model_t.model,
@@ -568,7 +607,7 @@ def main(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(add_help=True)
-    parser.add_argument("--lr", type=float, default=0.001, help="Learning rate.")
+    parser.add_argument("--lr", type=float, default=0.01, help="Learning rate.")
     parser.add_argument("--batch_size", type=int, default=128, help="Batch size.")
     parser.add_argument("--n_channels", type=int, default=3, help="Number of channels.")
     parser.add_argument("--w", type=int, default=32, help="Width of the input images.")
@@ -609,7 +648,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-
     # Call the main function with parsed arguments
     main(
         lr=args.lr,
@@ -623,5 +661,5 @@ if __name__ == "__main__":
         device=args.device,
         save_path=args.save_path,
         headless=args.headless,
-        save_fig=args.save_fig
+        save_fig=args.save_fig,
     )

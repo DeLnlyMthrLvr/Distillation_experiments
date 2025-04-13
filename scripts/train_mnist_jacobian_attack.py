@@ -5,7 +5,7 @@ This script trains a teacher model on the MNIST dataset, generates adversarial e
 and evaluates the models' performance on both clean and adversarial data.
 
 To run the script you can use the following command, adjusting argumments as needed:
-ipython scripts/train_mnist_jacobian_attack.py -- --lr 0.001 --batch_size 256 --max_epochs 23 --temperature 20 --num_samples 100 --device 'mps'
+ipython scripts/train_mnist_jacobian_attack.py -- --lr 0.001 --batch_size 256 --max_epochs 1 --temperature 20 --num_samples 1 --device 'mps'
 
 
 """
@@ -120,8 +120,12 @@ def main(
     )
 
     # Define a simple CNN model for MNIST classification
-    teacher_model = MnistNet(input_size=w, temperature=temperature, raw_logits=True).to(device)
-    student_model = MnistNet(input_size=w, temperature=temperature, raw_logits=False).to(device)
+    teacher_model = MnistNet(input_size=w, temperature=temperature, raw_logits=True).to(
+        device
+    )
+    student_model = MnistNet(
+        input_size=w, temperature=temperature, raw_logits=False
+    ).to(device)
 
     # Specify the loss function and optimizer for teacher model
     criterion = nn.CrossEntropyLoss()
@@ -145,7 +149,9 @@ def main(
 
     ## Teacher Model
 
-    teacher_name = f"mnist_teacher_model_temp{temperature}_ep{max_epochs}_lr{lr}_batch{batch_size}"
+    teacher_name = (
+        f"mnist_teacher_model_temp{temperature}_ep{max_epochs}_lr{lr}_batch{batch_size}"
+    )
 
     # Load the model
     teacher_model = load_model(
@@ -160,7 +166,9 @@ def main(
         LOGGER.info("\nTraining Teacher Model")
 
         # Initialize the teacher model again
-        teacher_model = MnistNet(input_size=w, temperature=temperature, raw_logits=True).to(device)
+        teacher_model = MnistNet(
+            input_size=w, temperature=temperature, raw_logits=True
+        ).to(device)
 
         # Train the teacher model
         train_teacher(
@@ -191,7 +199,6 @@ def main(
         nb_classes=n_labels,
     )
 
-
     # Evaluate model on entire testset
     teacher_accuracy = evaluate_model(
         art_model_t.model, mnist_data, mnist_targets, device=device
@@ -218,14 +225,21 @@ def main(
 
     LOGGER.info("Generating Jacobian-Saliency Adversarial Examples")
 
-    expanded_data, expanded_labels, x_adv, y_adv = generate_adversarial_samples(mnist_data_subset, mnist_targets_subset, art_model_t, theta=0.50, gamma=0.40, batch_size=32, device=device)
+    expanded_data, expanded_labels, x_adv, y_adv = generate_adversarial_samples(
+        mnist_data_subset,
+        mnist_targets_subset,
+        art_model_t,
+        theta=0.50,
+        gamma=0.40,
+        batch_size=32,
+        device=device,
+    )
 
     visualize_adversarial(expanded_data, x_adv, expanded_labels, rgb=False)
-    
+
     show_difference(
         expanded_data[0][0], x_adv[0][0], title="Jacobian-Saliency Map Method"
     )
-
 
     # Evaluate the teacher model on adversarial examples
     LOGGER.info("Evaluating Teacher Model on Teacher-based Adversarial Examples:")
@@ -256,10 +270,9 @@ def main(
     )
 
     # Set to evaluation mode
-    student_model.eval()   
+    student_model.eval()
     # Set model temperature to 1 after training
     student_model.temperature = 1.0
-
 
     # Wrap in ART PyTorchClassifier
     art_model_s = PyTorchClassifier(
@@ -275,10 +288,10 @@ def main(
     student_accuracy = evaluate_model(
         art_model_s.model, mnist_data, mnist_targets, device=device
     )
-    LOGGER.info(f"Test Accuracy: {student_accuracy:.2f}%") 
+    LOGGER.info(f"Test Accuracy: {student_accuracy:.2f}%")
 
     # Criterion needs logits
-    student_model.raw_logits = True 
+    student_model.raw_logits = True
 
     # Display Gradient Amplitude
     LOGGER.info(
@@ -287,15 +300,22 @@ def main(
     LOGGER.info(
         f"Binned Mean Gradient Amplitude (as implemented in Paparnot et. al 2016): {calculate_binned_gradient_amplitude(art_model_s.model, mnist_data, mnist_targets, criterion, device=device)}"
     )
-    
+
     # Adversarial attacks
     # Generate Adversarial Examples from the Student Model
     LOGGER.info("\nGenerating Adversarial Examples from Student Model:")
 
     LOGGER.info("Generating Jacobian-Saliency Adversarial Examples")
 
-    expanded_data, expanded_labels, x_adv_s, y_adv_s = generate_adversarial_samples(mnist_data_subset, mnist_targets_subset, art_model_s, theta=0.50, gamma=0.40, batch_size=32, device=device)
-
+    expanded_data, expanded_labels, x_adv_s, y_adv_s = generate_adversarial_samples(
+        mnist_data_subset,
+        mnist_targets_subset,
+        art_model_s,
+        theta=0.50,
+        gamma=0.40,
+        batch_size=32,
+        device=device,
+    )
 
     visualize_adversarial(expanded_data, x_adv_s, expanded_labels, rgb=False)
     show_difference(
@@ -334,7 +354,7 @@ def main(
             device=device,
         )
     )
- 
+
     LOGGER.info("Evaluating Teacher Model on Student-based Adversarial Examples:")
     # FSGM
     LOGGER.info(
@@ -346,7 +366,6 @@ def main(
             device=device,
         )
     )
-
 
     # Save experiment results
     LOGGER.info("Saving experiment results")
